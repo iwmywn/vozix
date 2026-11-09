@@ -32,16 +32,16 @@ import { useRecurring } from "@/contexts/recurring-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
-import { localDateToUTCMidnight } from "@/lib/date"
-import type { RecurringTransaction } from "@/lib/definitions"
-import { getNextOccurrence as getNextDate } from "@/lib/recurring"
+import type { RecurringTransaction, ScheduleStatus } from "@/lib/definitions"
+import type { EvaluatedRecurringSchedule } from "@/lib/recurring"
+import { getScheduleStatusClass } from "@/lib/utils"
 
 interface RecurringTableProps {
-  filteredRecurring: RecurringTransaction[]
+  evaluatedSchedules: EvaluatedRecurringSchedule[]
 }
 
 export function RecurringTransactionsTable({
-  filteredRecurring,
+  evaluatedSchedules,
 }: RecurringTableProps) {
   const { recurringTransactions } = useRecurring()
   const [selectedRecurring, setSelectedRecurring] =
@@ -51,7 +51,12 @@ export function RecurringTransactionsTable({
   const { getCategoryLabel, getCategoryDescription } = useCategory()
   const formatDate = useFormatDate()
   const formatCurrency = useFormatCurrency()
-  const [todayUTC] = useState(() => localDateToUTCMidnight(new Date()))
+
+  const statusLabels: Record<ScheduleStatus, string> = {
+    expired: t("Expired"),
+    upcoming: t("Upcoming"),
+    active: t("Active"),
+  }
 
   const getFrequencyLabel = (frequency: RecurringTransaction["frequency"]) => {
     switch (frequency) {
@@ -78,7 +83,7 @@ export function RecurringTransactionsTable({
     <>
       <Card>
         <CardContent>
-          {filteredRecurring.length === 0 ? (
+          {evaluatedSchedules.length === 0 ? (
             <EmptyState
               icon={<RepeatIcon />}
               title={t("No recurring transactions found")}
@@ -104,38 +109,25 @@ export function RecurringTransactionsTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecurring.map((recurring) => {
-                  const isUpcoming = Boolean(
-                    recurring.startDate &&
-                    new Date(recurring.startDate) > todayUTC
-                  )
-                  const isEnded = Boolean(
-                    recurring.endDate && todayUTC > new Date(recurring.endDate)
-                  )
-
-                  const nextDate = getNextDate(recurring, todayUTC)
-
-                  return (
-                    <TableRow
-                      key={recurring._id}
-                      className="[&>td]:text-center"
-                    >
-                      <TableCell>{formatDate(recurring.startDate)}</TableCell>
+                {evaluatedSchedules.map(
+                  ({ schedule, status, nextOccurrenceDate }) => (
+                    <TableRow key={schedule._id} className="[&>td]:text-center">
+                      <TableCell>{formatDate(schedule.startDate)}</TableCell>
                       <TableCell>
-                        {recurring.endDate
-                          ? formatDate(recurring.endDate)
+                        {schedule.endDate
+                          ? formatDate(schedule.endDate)
                           : t("No end date")}
                       </TableCell>
-                      <TableCell>{recurring.description}</TableCell>
+                      <TableCell>{schedule.description}</TableCell>
                       <TableCell>
                         <Badge
                           className={
-                            recurring.type === "inflow"
+                            schedule.type === "inflow"
                               ? "badge-green"
                               : "badge-red"
                           }
                         >
-                          {recurring.type === "inflow"
+                          {schedule.type === "inflow"
                             ? t("Inflow")
                             : t("Outflow")}
                         </Badge>
@@ -144,52 +136,40 @@ export function RecurringTransactionsTable({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge variant="outline">
-                              {getCategoryLabel(recurring.categoryKey)}
+                              {getCategoryLabel(schedule.categoryKey)}
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {getCategoryDescription(recurring.categoryKey)}
+                            {getCategoryDescription(schedule.categoryKey)}
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(recurring.amount, recurring.currency)}
+                        {formatCurrency(schedule.amount, schedule.currency)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <span>{getFrequencyLabel(recurring.frequency)}</span>
-                          {recurring.frequency === "random" ? (
+                          <span>{getFrequencyLabel(schedule.frequency)}</span>
+                          {schedule.frequency === "random" ? (
                             <span className="text-xs text-secondary">
                               {t("Every {days} days", {
                                 days:
-                                  recurring.randomEveryXDays?.toString() ?? "—",
+                                  schedule.randomEveryXDays?.toString() ?? "—",
                               })}
                             </span>
                           ) : null}
-                          {!isEnded && nextDate ? (
+                          {status !== "expired" && nextOccurrenceDate ? (
                             <span className="text-xs text-secondary">
                               {t("Next: {date}", {
-                                date: formatDate(nextDate),
+                                date: formatDate(nextOccurrenceDate),
                               })}
                             </span>
                           ) : null}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          className={
-                            isEnded
-                              ? "badge-gray"
-                              : isUpcoming
-                                ? "badge-yellow"
-                                : "badge-green"
-                          }
-                        >
-                          {isEnded
-                            ? t("Inactive")
-                            : isUpcoming
-                              ? t("Upcoming")
-                              : t("Active")}
+                        <Badge className={getScheduleStatusClass(status)}>
+                          {statusLabels[status]}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -204,7 +184,7 @@ export function RecurringTransactionsTable({
                             <DropdownMenuItem
                               variant="destructive"
                               onClick={() => {
-                                setSelectedRecurring(recurring)
+                                setSelectedRecurring(schedule)
                                 setIsDeleteOpen(true)
                               }}
                             >
@@ -215,7 +195,7 @@ export function RecurringTransactionsTable({
                       </TableCell>
                     </TableRow>
                   )
-                })}
+                )}
               </TableBody>
             </Table>
           )}

@@ -8,11 +8,16 @@ import {
   isDateRangeOverlapping,
   normalizeToUTCMidnight,
 } from "@/lib/date"
-import type { Budget, Goal, Transaction } from "@/lib/definitions"
+import type {
+  Budget,
+  Goal,
+  ScheduleStatus,
+  Transaction,
+} from "@/lib/definitions"
+import { resolveScheduleBoundaries } from "@/lib/recurring"
 import { searchWithMiniSearch } from "@/lib/utils"
 
 export type RollupHealth = "unstarted" | "on_track" | "warning" | "exceeded"
-export type ScheduleStatus = "upcoming" | "active" | "expired"
 
 export interface ValuationOptions {
   timeZone?: string
@@ -191,8 +196,11 @@ export class FinancialRollupEngine {
     expectedType: "inflow" | "outflow",
     scheduledAmountInput: string
   ) {
-    const startDateOnly = normalizeToUTCMidnight(new Date(schedule.startDate))
-    const endDateOnly = normalizeToUTCMidnight(new Date(schedule.endDate))
+    const { startDateOnly, endDateOnly, status } = resolveScheduleBoundaries(
+      schedule.startDate,
+      schedule.endDate,
+      this.todayUTC
+    )
     const scheduleCurrency = schedule.currency
 
     let total = new Decimal(0)
@@ -207,7 +215,7 @@ export class FinancialRollupEngine {
       const txDateOnly = normalizeToUTCMidnight(new Date(t.date))
       if (
         txDateOnly.getTime() < startDateOnly.getTime() ||
-        txDateOnly.getTime() > endDateOnly.getTime()
+        (endDateOnly && txDateOnly.getTime() > endDateOnly.getTime())
       ) {
         continue
       }
@@ -226,15 +234,6 @@ export class FinancialRollupEngine {
     const percentage = scheduledAmount.equals(0)
       ? 0
       : total.dividedBy(scheduledAmount).mul(100).toNumber()
-
-    let status: ScheduleStatus
-    if (endDateOnly.getTime() < this.todayUTC.getTime()) {
-      status = "expired"
-    } else if (startDateOnly.getTime() <= this.todayUTC.getTime()) {
-      status = "active"
-    } else {
-      status = "upcoming"
-    }
 
     const convertedCount = matchingTransactions.length - unconvertedCount
 

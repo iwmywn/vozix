@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { cn } from "cn"
 import { SearchIcon, XIcon } from "lucide-react"
-import { useExtracted } from "next-intl"
+import { useExtracted, useTimeZone } from "next-intl"
 
 import { RecurringTransactionsTable } from "@/components/recurring-transactions/recurring-transactions-table"
 import { Button } from "@/components/ui/button"
@@ -27,20 +27,25 @@ import {
 import { useRecurring } from "@/contexts/recurring-context"
 import { useCategory } from "@/hooks/use-category"
 import { useMonths } from "@/hooks/use-months"
-import { getUniqueDateRangeYears, localDateToUTCMidnight } from "@/lib/date"
-import { filterRecurringTransactions } from "@/lib/filters"
+import type { CategoryKey, CategoryType } from "@/lib/category"
+import { getUniqueDateRangeYears } from "@/lib/date"
+import type { ScheduleStatus } from "@/lib/definitions"
+import { evaluateRecurringSchedules } from "@/lib/recurring"
 
 export function RecurringTransactionFilters() {
   const { recurringTransactions } = useRecurring()
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [filterMonth, setFilterMonth] = useState<string>("all")
   const [filterYear, setFilterYear] = useState<string>("all")
-  const [filterType, setFilterType] = useState<string>("all")
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "inactive" | "upcoming"
+  const [filterType, setFilterType] = useState<CategoryType | "all">("all")
+  const [filterStatus, setFilterStatus] = useState<ScheduleStatus | "all">(
+    "all"
+  )
+  const [filterCategoryKey, setFilterCategoryKey] = useState<
+    CategoryKey | "all"
   >("all")
-  const [filterCategoryKey, setFilterCategoryKey] = useState<string>("all")
   const t = useExtracted()
+  const timeZone = useTimeZone()
   const { getCategoriesByType } = useCategory()
 
   const allMonths = useMonths()
@@ -63,17 +68,31 @@ export function RecurringTransactionFilters() {
     setFilterCategoryKey("all")
   }
 
-  const [todayUTC] = useState(() => localDateToUTCMidnight(new Date()))
-
-  const filteredRecurring = filterRecurringTransactions(recurringTransactions, {
-    searchTerm,
-    filterMonth,
-    filterYear,
-    filterType,
-    filterStatus,
-    filterCategoryKey,
-    todayUTC,
-  })
+  const { filteredSchedules } = useMemo(
+    () =>
+      evaluateRecurringSchedules(
+        recurringTransactions,
+        {
+          searchTerm,
+          filterMonth,
+          filterYear,
+          filterType,
+          filterStatus,
+          filterCategoryKey,
+        },
+        { timeZone }
+      ),
+    [
+      recurringTransactions,
+      searchTerm,
+      filterMonth,
+      filterYear,
+      filterType,
+      filterStatus,
+      filterCategoryKey,
+      timeZone,
+    ]
+  )
 
   return (
     <>
@@ -156,7 +175,10 @@ export function RecurringTransactionFilters() {
               </SelectContent>
             </Select>
 
-            <Select value={filterType} onValueChange={setFilterType}>
+            <Select
+              value={filterType}
+              onValueChange={(val: CategoryType | "all") => setFilterType(val)}
+            >
               <SelectTrigger
                 className={cn(
                   "w-full",
@@ -177,7 +199,9 @@ export function RecurringTransactionFilters() {
 
             <Select
               value={filterCategoryKey}
-              onValueChange={setFilterCategoryKey}
+              onValueChange={(val: CategoryKey | "all") =>
+                setFilterCategoryKey(val)
+              }
             >
               <SelectTrigger
                 className={cn(
@@ -210,9 +234,9 @@ export function RecurringTransactionFilters() {
 
             <Select
               value={filterStatus}
-              onValueChange={(
-                value: "all" | "active" | "inactive" | "upcoming"
-              ) => setFilterStatus(value)}
+              onValueChange={(value: ScheduleStatus | "all") =>
+                setFilterStatus(value)
+              }
             >
               <SelectTrigger
                 className={cn(
@@ -228,7 +252,7 @@ export function RecurringTransactionFilters() {
                   <SelectSeparator />
                   <SelectItem value="active">{t("Active")}</SelectItem>
                   <SelectItem value="upcoming">{t("Upcoming")}</SelectItem>
-                  <SelectItem value="inactive">{t("Inactive")}</SelectItem>
+                  <SelectItem value="expired">{t("Expired")}</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -246,7 +270,7 @@ export function RecurringTransactionFilters() {
         </CardContent>
       </Card>
 
-      <RecurringTransactionsTable filteredRecurring={filteredRecurring} />
+      <RecurringTransactionsTable evaluatedSchedules={filteredSchedules} />
     </>
   )
 }

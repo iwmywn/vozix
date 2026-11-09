@@ -14,6 +14,8 @@ export type ActionResponse =
   | { error: string; success?: never }
   | { error?: never; success: string }
 
+export type ScheduleStatus = "upcoming" | "active" | "expired"
+
 export type AuthErrorCode = keyof (typeof auth)["$ERROR_CODES"]
 
 export type DBUser = { _id: ObjectId } & Omit<User, "id">

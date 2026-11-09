@@ -14,6 +14,14 @@ _Avoid_: Recurring transaction, subscription, cron rule
 A concrete transaction produced from a recurring schedule representing a scheduled due date.
 _Avoid_: Generated transaction, schedule instance, recurring item
 
+**Schedule Status**:
+The lifecycle state of a recurring schedule or financial window (`upcoming`, `active`, `expired`).
+
+- `upcoming`: The schedule's start date has not yet arrived relative to current date.
+- `active`: The schedule is within its active date window (startDate <= current date <= endDate or no endDate).
+- `expired`: The schedule's end date has passed.
+  _Avoid_: Inactive status, recurring status, active flag
+
 ### Currency & Valuation
 
 **Base Currency**:

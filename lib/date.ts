@@ -1,6 +1,5 @@
 import type { Locale } from "@/i18n/config"
-
-import type { Transaction } from "./definitions"
+import type { Transaction } from "@/lib/definitions"
 
 export type DateParts = {
   year: number
