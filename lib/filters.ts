@@ -1,10 +1,5 @@
-import { isDateRangeOverlapping, localDateToUTCMidnight } from "@/lib/date"
-import type {
-  Category,
-  RecurringTransaction,
-  Transaction,
-  User,
-} from "@/lib/definitions"
+import { localDateToUTCMidnight } from "@/lib/date"
+import type { Category, Transaction, User } from "@/lib/definitions"
 import { isUserBanned, searchWithMiniSearch } from "@/lib/utils"
 
 type Filters = {
@@ -20,7 +15,6 @@ type Filters = {
   filterCategoryKey?: string
   filterStatus?: string
   filterRole?: string
-  todayUTC?: Date
 }
 
 export function filterTransactions(
@@ -103,66 +97,6 @@ export function filterCustomCategories(
     const matchesSearch = matchingIds ? matchingIds.has(category._id) : true
 
     return matchesType && matchesSearch
-  })
-}
-
-export function filterRecurringTransactions(
-  recurringTransactions: RecurringTransaction[],
-  filters: Filters
-): RecurringTransaction[] {
-  const {
-    searchTerm = "",
-    filterMonth = "all",
-    filterYear = "all",
-    filterType = "all",
-    filterCategoryKey = "all",
-    filterStatus = "all",
-  } = filters
-
-  const parsedMonth = filterMonth === "all" ? null : parseInt(filterMonth)
-  const parsedYear = filterYear === "all" ? null : parseInt(filterYear)
-
-  const matchingIds = searchTerm
-    ? searchWithMiniSearch(recurringTransactions, searchTerm, ["description"])
-    : null
-
-  const todayUTC = filters.todayUTC ?? localDateToUTCMidnight(new Date())
-
-  return recurringTransactions.filter((recurring) => {
-    const matchesSearch = matchingIds ? matchingIds.has(recurring._id) : true
-
-    const startDateOnly = new Date(recurring.startDate)
-    const endDateOnly = recurring.endDate ? new Date(recurring.endDate) : null
-
-    const overlaps = isDateRangeOverlapping(
-      startDateOnly,
-      endDateOnly,
-      parsedMonth,
-      parsedYear
-    )
-
-    const matchesType = filterType === "all" || recurring.type === filterType
-
-    const matchesCategory =
-      filterCategoryKey === "all" || recurring.categoryKey === filterCategoryKey
-
-    const isUpcoming = startDateOnly > todayUTC
-    const isEnded = Boolean(endDateOnly && todayUTC > endDateOnly)
-    const isActive = !isUpcoming && !isEnded
-
-    const matchesStatus =
-      filterStatus === "all" ||
-      (filterStatus === "active" && isActive) ||
-      (filterStatus === "upcoming" && isUpcoming) ||
-      (filterStatus === "inactive" && isEnded)
-
-    return (
-      matchesSearch &&
-      overlaps &&
-      matchesType &&
-      matchesCategory &&
-      matchesStatus
-    )
   })
 }
 

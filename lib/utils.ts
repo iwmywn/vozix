@@ -2,7 +2,8 @@ import type { Route } from "next"
 import Decimal from "decimal.js"
 import MiniSearch from "minisearch"
 
-import type { RollupHealth, ScheduleStatus } from "@/lib/valuation-engine"
+import type { ScheduleStatus } from "@/lib/definitions"
+import type { RollupHealth } from "@/lib/valuation-engine"
 import { DEFAULT_SIGNIN_REDIRECT } from "@/routes"
 
 export function searchWithMiniSearch<T extends Record<string, unknown>>(

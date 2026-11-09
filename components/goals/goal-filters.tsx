@@ -29,8 +29,9 @@ import { useCategory } from "@/hooks/use-category"
 import { useMonths } from "@/hooks/use-months"
 import type { CategoryKey } from "@/lib/category"
 import { getUniqueDateRangeYears } from "@/lib/date"
+import type { ScheduleStatus } from "@/lib/definitions"
 import { FinancialRollupEngine } from "@/lib/valuation-engine"
-import type { RollupHealth, ScheduleStatus } from "@/lib/valuation-engine"
+import type { RollupHealth } from "@/lib/valuation-engine"
 
 export function GoalFilters() {
   const { goals } = useGoals()

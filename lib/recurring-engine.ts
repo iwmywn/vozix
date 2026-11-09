@@ -12,7 +12,7 @@ import { normalizeToUTCMidnight } from "@/lib/date"
 import { withTransaction } from "@/lib/db"
 import type { DBRecurringTransaction } from "@/lib/definitions"
 import { isDuplicateKeyError } from "@/lib/indexes"
-import { getDueOccurrences } from "@/lib/recurring"
+import { getDueOccurrences, resolveScheduleBoundaries } from "@/lib/recurring"
 
 export * from "@/lib/recurring"
 
@@ -117,15 +117,17 @@ export async function processDueRecurringTransactions(
           const allDueDates = getDueOccurrences(rec, todayUTC)
           if (allDueDates.length === 0) {
             skippedReason.push({ id: rec._id.toString(), reason: "notToday" })
-            if (
-              rec.endDate &&
-              normalizeToUTCMidnight(rec.endDate).getTime() < todayUTC.getTime()
-            ) {
+            const boundaries = resolveScheduleBoundaries(
+              rec.startDate,
+              rec.endDate,
+              todayUTC
+            )
+            if (boundaries.status === "expired" && boundaries.endDateOnly) {
               await recurringCollection.updateOne(
                 { _id: rec._id },
                 {
                   $set: {
-                    lastGeneratedDate: normalizeToUTCMidnight(rec.endDate),
+                    lastGeneratedDate: boundaries.endDateOnly,
                   },
                 }
               )
