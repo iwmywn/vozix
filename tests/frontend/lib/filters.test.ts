@@ -682,6 +682,26 @@ describe("Filters", () => {
       })
     })
 
+    it("should clear existing end date when start date is deselected", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: undefined,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "all",
+          filterYear: "all",
+        },
+        { type: "selectRangeFrom", date: undefined }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
     it("should set start date and clear mutually exclusive filters without completing range when selecting end date while start date is unset", () => {
       const next = applyTemporalFilterChange(
         {

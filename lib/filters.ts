@@ -149,7 +149,7 @@ export function applyTemporalFilterChange(
       const nextFrom = action.date ?? undefined
       const currentTo = base.dateRange.to
       const nextTo =
-        currentTo && nextFrom && nextFrom > currentTo ? undefined : currentTo
+        !nextFrom || (currentTo && nextFrom > currentTo) ? undefined : currentTo
       const hasRangeEndpoint = Boolean(nextFrom || nextTo)
       return {
         selectedDate: hasRangeEndpoint ? undefined : base.selectedDate,
