@@ -30,7 +30,12 @@ import { useFormatDate } from "@/hooks/use-format-date"
 import { useMonths } from "@/hooks/use-months"
 import type { Currency } from "@/lib/currency"
 import { getUniqueYears } from "@/lib/date"
-import { filterTransactions } from "@/lib/filters"
+import {
+  applyTemporalFilterChange,
+  filterTransactions,
+  hasActiveTemporalFilters,
+} from "@/lib/filters"
+import type { TemporalFilterAction } from "@/lib/filters"
 import { FinancialRollupEngine } from "@/lib/valuation-engine"
 
 export function StatisticsFilters() {
@@ -41,78 +46,27 @@ export function StatisticsFilters() {
   const formatDate = useFormatDate()
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false)
   const [isDateRangeOpen, setIsDateRangeOpen] = useState<boolean>(false)
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
-  const [dateRange, setDateRange] = useState<{
-    from: Date | undefined
-    to: Date | undefined
-  }>({
-    from: undefined,
-    to: undefined,
-  })
-  const [filterMonth, setFilterMonth] = useState<string>("all")
-  const [filterYear, setFilterYear] = useState<string>("all")
+  const [temporalState, setTemporalState] = useState(() =>
+    applyTemporalFilterChange({}, { type: "reset" })
+  )
+  const { selectedDate, dateRange, filterMonth, filterYear } = temporalState
 
   const allMonths = useMonths()
   const allYears = getUniqueYears(transactions)
 
-  const hasActiveFilters =
-    selectedDate ||
-    dateRange.from ||
-    dateRange.to ||
-    filterMonth !== "all" ||
-    filterYear !== "all"
+  const hasActiveFilters = hasActiveTemporalFilters(temporalState)
 
-  const handleResetFilters = () => {
-    setSelectedDate(undefined)
-    setDateRange({ from: undefined, to: undefined })
-    setFilterMonth("all")
-    setFilterYear("all")
-  }
-
-  const handleDateChange = (date: Date | undefined) => {
-    setSelectedDate(date)
-    setDateRange({ from: undefined, to: undefined })
-    setFilterMonth("all")
-    setFilterYear("all")
-    setIsDatePickerOpen(false)
-  }
-
-  const handleDateRangeChange = (range: {
-    from: Date | undefined
-    to: Date | undefined
-  }) => {
-    setDateRange(range)
-    setSelectedDate(undefined)
-    setFilterMonth("all")
-    setFilterYear("all")
-    setIsDateRangeOpen(false)
-  }
-
-  const handleMonthChange = (month: string) => {
-    setFilterMonth(month)
-    if (month !== "all") {
-      setSelectedDate(undefined)
-      setDateRange({ from: undefined, to: undefined })
-    }
-  }
-
-  const handleYearChange = (year: string) => {
-    setFilterYear(year)
-    if (year !== "all") {
-      setSelectedDate(undefined)
-      setDateRange({ from: undefined, to: undefined })
+  const commitTemporalTransition = (action: TemporalFilterAction) => {
+    const nextState = applyTemporalFilterChange(temporalState, action)
+    setTemporalState(nextState)
+    if (nextState.completed) {
+      setIsDateRangeOpen(false)
     }
   }
 
   const filteredTransactions = useMemo(
-    () =>
-      filterTransactions(transactions, {
-        selectedDate,
-        dateRange,
-        filterMonth,
-        filterYear,
-      }),
-    [transactions, selectedDate, dateRange, filterMonth, filterYear]
+    () => filterTransactions(transactions, temporalState),
+    [transactions, temporalState]
   )
 
   const engine = useMemo(
@@ -158,7 +112,10 @@ export function StatisticsFilters() {
                   mode="single"
                   selected={selectedDate}
                   captionLayout="dropdown"
-                  onSelect={(date) => handleDateChange(date)}
+                  onSelect={(date) => {
+                    commitTemporalTransition({ type: "selectDate", date })
+                    setIsDatePickerOpen(false)
+                  }}
                 />
               </PopoverContent>
             </Popover>
@@ -197,15 +154,12 @@ export function StatisticsFilters() {
                       selected={dateRange.from}
                       defaultMonth={dateRange.from}
                       captionLayout="dropdown"
-                      onSelect={(date) => {
-                        setDateRange((prev) => ({
-                          from: date,
-                          to:
-                            prev.to && date && date > prev.to
-                              ? undefined
-                              : prev.to,
-                        }))
-                      }}
+                      onSelect={(date) =>
+                        commitTemporalTransition({
+                          type: "selectRangeFrom",
+                          date,
+                        })
+                      }
                     />
                   </div>
                   <div>
@@ -216,34 +170,24 @@ export function StatisticsFilters() {
                       selected={dateRange.to}
                       defaultMonth={dateRange.to}
                       captionLayout="dropdown"
-                      onSelect={(date) => {
-                        if (!date) return
-                        if (!dateRange.from) {
-                          setDateRange({
-                            from: date,
-                            to: undefined,
-                          })
-                          return
-                        }
-                        if (date < dateRange.from) {
-                          handleDateRangeChange({
-                            from: date,
-                            to: dateRange.from,
-                          })
-                          return
-                        }
-                        handleDateRangeChange({
-                          from: dateRange.from,
-                          to: date,
+                      onSelect={(date) =>
+                        commitTemporalTransition({
+                          type: "selectRangeTo",
+                          date,
                         })
-                      }}
+                      }
                     />
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
 
-            <Select value={filterMonth} onValueChange={handleMonthChange}>
+            <Select
+              value={filterMonth}
+              onValueChange={(month) =>
+                commitTemporalTransition({ type: "selectMonth", month })
+              }
+            >
               <SelectTrigger
                 className={cn(
                   "w-full",
@@ -265,7 +209,12 @@ export function StatisticsFilters() {
               </SelectContent>
             </Select>
 
-            <Select value={filterYear} onValueChange={handleYearChange}>
+            <Select
+              value={filterYear}
+              onValueChange={(year) =>
+                commitTemporalTransition({ type: "selectYear", year })
+              }
+            >
               <SelectTrigger
                 className={cn(
                   "w-full",
@@ -290,7 +239,7 @@ export function StatisticsFilters() {
             {hasActiveFilters && (
               <Button
                 variant="outline"
-                onClick={handleResetFilters}
+                onClick={() => commitTemporalTransition({ type: "reset" })}
                 className="sm:col-span-2 lg:col-span-1"
               >
                 {t("Reset")}
@@ -305,12 +254,7 @@ export function StatisticsFilters() {
       <StatisticsTable
         valuations={valuations}
         hasUnconverted={summary.unconvertedCount > 0}
-        filterStates={{
-          selectedDate,
-          dateRange,
-          filterMonth,
-          filterYear,
-        }}
+        filterStates={temporalState}
       />
     </>
   )

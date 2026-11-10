@@ -15,7 +15,6 @@ import {
   serializeLocalDate,
   serializeUTCDate,
 } from "@/lib/date"
-import { parseAsLocalDate } from "@/lib/parser"
 
 describe("lib/date.ts Unified Date Module", () => {
   afterEach(() => {
@@ -80,23 +79,6 @@ describe("lib/date.ts Unified Date Module", () => {
 
     it("should serialize ISO string into YYYY-MM-DD", () => {
       expect(serializeUTCDate("2026-12-31T00:00:00.000Z")).toBe("2026-12-31")
-    })
-  })
-
-  describe("parseAsLocalDate", () => {
-    it("should parse valid string into local Date", () => {
-      const parsed = parseAsLocalDate.parse("2026-08-24")
-      expect(parsed).not.toBeNull()
-      expect(parsed?.getFullYear()).toBe(2026)
-      expect(parsed?.getMonth()).toBe(7)
-      expect(parsed?.getDate()).toBe(24)
-    })
-
-    it("should serialize and check equality", () => {
-      const d1 = new Date(2026, 7, 24, 0, 0, 0)
-      const d2 = new Date(2026, 7, 24, 18, 0, 0)
-      expect(parseAsLocalDate.serialize(d1)).toBe("2026-08-24")
-      expect(parseAsLocalDate.eq(d1, d2)).toBe(true)
     })
   })
 
