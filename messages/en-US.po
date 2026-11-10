@@ -1284,6 +1284,8 @@ msgstr "Upcoming"
 #: components/budgets/budgets-table.tsx
 #: components/goals/goal-filters.tsx
 #: components/goals/goals-table.tsx
+#: components/recurring-transactions/recurring-transaction-filters.tsx
+#: components/recurring-transactions/recurring-transactions-table.tsx
 msgctxt "RahCRH"
 msgid "Expired"
 msgstr "Expired"
@@ -1862,12 +1864,6 @@ msgctxt "jZimtU"
 msgid "Search recurring transactions..."
 msgstr "Search recurring transactions..."
 
-#: components/recurring-transactions/recurring-transaction-filters.tsx
-#: components/recurring-transactions/recurring-transactions-table.tsx
-msgctxt "6Tps09"
-msgid "Inactive"
-msgstr "Inactive"
-
 #: components/recurring-transactions/recurring-transaction-form.tsx
 msgctxt "sYXY5N"
 msgid "Add Recurring Transaction"
@@ -2314,6 +2310,12 @@ msgstr "Total number of transactions"
 
 #: components/statistics/statistics-table.tsx
 #: components/transactions/transactions-table.tsx
+msgctxt "iRMvlA"
+msgid "Exchange rate pending"
+msgstr "Exchange rate pending"
+
+#: components/statistics/statistics-table.tsx
+#: components/transactions/transactions-table.tsx
 msgctxt "Cl5VLx"
 msgid "No transactions found matching your filters."
 msgstr "No transactions found matching your filters."
@@ -2404,11 +2406,6 @@ msgstr "Enter a description for the transaction..."
 msgctxt "MBywHq"
 msgid "Manage cash inflows and outflows to track your personal finances."
 msgstr "Manage cash inflows and outflows to track your personal finances."
-
-#: components/transactions/transactions-table.tsx
-msgctxt "iRMvlA"
-msgid "Exchange rate pending"
-msgstr "Exchange rate pending"
 
 #: components/transactions/unconverted-transactions-alert.tsx
 msgctxt "bBbh-Z"

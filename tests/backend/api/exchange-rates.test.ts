@@ -60,22 +60,8 @@ describe("Exchange Rates Cron Job", () => {
   })
 
   describe("Cron execution", () => {
-    it("should fetch rates for yesterday when no rates exist", async () => {
-      const mockRatesResponse = {
-        meta: { last_updated_at: "2024-03-10T23:59:59Z" },
-        data: {
-          CNY: { code: "CNY", value: 7.18 },
-          JPY: { code: "JPY", value: 147.2 },
-          KRW: { code: "KRW", value: 1320.5 },
-          USD: { code: "USD", value: 1 },
-          VND: { code: "VND", value: 24600 },
-        },
-      }
-
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockRatesResponse,
-      } as Response)
+    it("should not fetch any rates when missing rates queue is empty", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch")
 
       const request = new NextRequest(cronEndpoint, {
         headers: {
@@ -88,21 +74,10 @@ describe("Exchange Rates Cron Job", () => {
 
       const json = await response.json()
       expect(json.success).toBe(true)
-      expect(json.syncedCount).toBeGreaterThanOrEqual(1)
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
-
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = new Date(todayUTC.getTime() - 24 * 60 * 60 * 1000)
-
-      const exchangeRatesCollection = await getExchangeRatesCollection()
-      const saved = await exchangeRatesCollection.findOne({
-        date: yesterdayUTC,
-      })
-
-      expect(saved).not.toBeNull()
-      expect(saved?.rates.VND?.toString()).toBe("24600")
-      expect(saved?.rates.CNY?.toString()).toBe("7.18")
+      expect(json.checkedCount).toBe(0)
+      expect(json.missingCount).toBe(0)
+      expect(json.syncedCount).toBe(0)
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
 
     it("should fetch missing rates for queued dates from missingExchangeRates", async () => {
@@ -158,6 +133,14 @@ describe("Exchange Rates Cron Job", () => {
     })
 
     it("should handle API failure gracefully without returning 500", async () => {
+      const pastDate = new Date("2024-01-15T00:00:00Z")
+      await insertTestMissingExchangeRate({
+        _id: new ObjectId(),
+        date: pastDate,
+        createdAt: new Date(),
+        retryCount: 0,
+      })
+
       vi.spyOn(globalThis, "fetch").mockResolvedValue({
         ok: false,
         status: 500,
@@ -264,6 +247,13 @@ describe("Exchange Rates Cron Job", () => {
       const now = new Date()
       const todayUTC = normalizeToUTCMidnight(now)
       const yesterdayUTC = addDays(todayUTC, -1)
+
+      await insertTestMissingExchangeRate({
+        _id: new ObjectId(),
+        date: yesterdayUTC,
+        createdAt: new Date(),
+        retryCount: 0,
+      })
 
       // Insert transactions for two different users on yesterdayUTC
       await insertTestTransaction({
@@ -373,21 +363,6 @@ describe("Exchange Rates Cron Job", () => {
         },
       })
 
-      // Also insert complete exchange rate for yesterday so only pastDate is tested
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = addDays(todayUTC, -1)
-      await exchangeRatesCollection.insertOne({
-        date: yesterdayUTC,
-        rates: {
-          CNY: toDecimal128("7.18"),
-          JPY: toDecimal128("147.2"),
-          KRW: toDecimal128("1320.5"),
-          USD: toDecimal128("1"),
-          VND: toDecimal128("24600"),
-        },
-      })
-
       const fetchSpy = vi.spyOn(globalThis, "fetch")
 
       const request = new NextRequest(cronEndpoint, {
@@ -433,21 +408,6 @@ describe("Exchange Rates Cron Job", () => {
         },
       })
 
-      // Pre-insert yesterday rate so only pastDate is synced
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = addDays(todayUTC, -1)
-      await exchangeRatesCollection.insertOne({
-        date: yesterdayUTC,
-        rates: {
-          CNY: toDecimal128("7.18"),
-          JPY: toDecimal128("147.2"),
-          KRW: toDecimal128("1320.5"),
-          USD: toDecimal128("1"),
-          VND: toDecimal128("24600"),
-        },
-      })
-
       const mockRatesResponse = {
         meta: { last_updated_at: "2024-02-15T23:59:59Z" },
         data: {
@@ -482,29 +442,13 @@ describe("Exchange Rates Cron Job", () => {
     })
 
     it("should limit processing to MAX_DATES_PER_RUN (5 dates) and correctly report remainingCount", async () => {
-      // Pre-insert yesterday rate so only queued dates are considered
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = addDays(todayUTC, -1)
-
-      const exchangeRatesCollection = await getExchangeRatesCollection()
-      await exchangeRatesCollection.insertOne({
-        date: yesterdayUTC,
-        rates: {
-          CNY: toDecimal128("7.18"),
-          JPY: toDecimal128("147.2"),
-          KRW: toDecimal128("1320.5"),
-          USD: toDecimal128("1"),
-          VND: toDecimal128("24600"),
-        },
-      })
-
       // Insert 7 missing rate dates
-      for (let i = 1; i <= 7; i++) {
+      for (let day = 1; day <= 7; day++) {
+        const dayStr = String(day).padStart(2, "0")
         await insertTestMissingExchangeRate({
           _id: new ObjectId(),
-          date: new Date(`2024-01-0${i}T00:00:00Z`),
-          createdAt: new Date(`2024-01-0${i}T10:00:00Z`),
+          date: new Date(`2024-01-${dayStr}T00:00:00Z`),
+          createdAt: new Date(`2024-01-${dayStr}T10:00:00Z`),
           retryCount: 0,
         })
       }
@@ -549,22 +493,6 @@ describe("Exchange Rates Cron Job", () => {
         createdAt: new Date(),
         retryCount: 6,
         status: "failed",
-      })
-
-      // Pre-insert yesterday rate so no fetch is made
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = addDays(todayUTC, -1)
-      const exchangeRatesCollection = await getExchangeRatesCollection()
-      await exchangeRatesCollection.insertOne({
-        date: yesterdayUTC,
-        rates: {
-          CNY: toDecimal128("7.18"),
-          JPY: toDecimal128("147.2"),
-          KRW: toDecimal128("1320.5"),
-          USD: toDecimal128("1"),
-          VND: toDecimal128("24600"),
-        },
       })
 
       const fetchSpy = vi.spyOn(globalThis, "fetch")
