@@ -1284,6 +1284,8 @@ msgstr "Sắp tới"
 #: components/budgets/budgets-table.tsx
 #: components/goals/goal-filters.tsx
 #: components/goals/goals-table.tsx
+#: components/recurring-transactions/recurring-transaction-filters.tsx
+#: components/recurring-transactions/recurring-transactions-table.tsx
 msgctxt "RahCRH"
 msgid "Expired"
 msgstr "Đã hết hạn"
@@ -1862,12 +1864,6 @@ msgctxt "jZimtU"
 msgid "Search recurring transactions..."
 msgstr "Tìm kiếm giao dịch định kỳ..."
 
-#: components/recurring-transactions/recurring-transaction-filters.tsx
-#: components/recurring-transactions/recurring-transactions-table.tsx
-msgctxt "6Tps09"
-msgid "Inactive"
-msgstr "Không hoạt động"
-
 #: components/recurring-transactions/recurring-transaction-form.tsx
 msgctxt "sYXY5N"
 msgid "Add Recurring Transaction"
@@ -2314,6 +2310,12 @@ msgstr "Tổng số giao dịch"
 
 #: components/statistics/statistics-table.tsx
 #: components/transactions/transactions-table.tsx
+msgctxt "iRMvlA"
+msgid "Exchange rate pending"
+msgstr "Đang chờ tỷ giá"
+
+#: components/statistics/statistics-table.tsx
+#: components/transactions/transactions-table.tsx
 msgctxt "Cl5VLx"
 msgid "No transactions found matching your filters."
 msgstr "Không tìm thấy giao dịch phù hợp với bộ lọc của bạn."
@@ -2404,11 +2406,6 @@ msgstr "Nhập mô tả cho giao dịch..."
 msgctxt "MBywHq"
 msgid "Manage cash inflows and outflows to track your personal finances."
 msgstr "Quản lý dòng tiền vào và ra để theo dõi tài chính cá nhân của bạn."
-
-#: components/transactions/transactions-table.tsx
-msgctxt "iRMvlA"
-msgid "Exchange rate pending"
-msgstr "Đang chờ tỷ giá"
 
 #: components/transactions/unconverted-transactions-alert.tsx
 msgctxt "bBbh-Z"

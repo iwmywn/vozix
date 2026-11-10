@@ -1284,6 +1284,8 @@ msgstr "予定"
 #: components/budgets/budgets-table.tsx
 #: components/goals/goal-filters.tsx
 #: components/goals/goals-table.tsx
+#: components/recurring-transactions/recurring-transaction-filters.tsx
+#: components/recurring-transactions/recurring-transactions-table.tsx
 msgctxt "RahCRH"
 msgid "Expired"
 msgstr "期限切れ"
@@ -1862,12 +1864,6 @@ msgctxt "jZimtU"
 msgid "Search recurring transactions..."
 msgstr "定期取引を検索..."
 
-#: components/recurring-transactions/recurring-transaction-filters.tsx
-#: components/recurring-transactions/recurring-transactions-table.tsx
-msgctxt "6Tps09"
-msgid "Inactive"
-msgstr "非アクティブ"
-
 #: components/recurring-transactions/recurring-transaction-form.tsx
 msgctxt "sYXY5N"
 msgid "Add Recurring Transaction"
@@ -2314,6 +2310,12 @@ msgstr "取引総数"
 
 #: components/statistics/statistics-table.tsx
 #: components/transactions/transactions-table.tsx
+msgctxt "iRMvlA"
+msgid "Exchange rate pending"
+msgstr "為替レート保留中"
+
+#: components/statistics/statistics-table.tsx
+#: components/transactions/transactions-table.tsx
 msgctxt "Cl5VLx"
 msgid "No transactions found matching your filters."
 msgstr "フィルターに一致する取引が見つかりませんでした。"
@@ -2404,11 +2406,6 @@ msgstr "取引の説明を入力..."
 msgctxt "MBywHq"
 msgid "Manage cash inflows and outflows to track your personal finances."
 msgstr "個人の財務を追跡するために現金の流入と流出を管理します。"
-
-#: components/transactions/transactions-table.tsx
-msgctxt "iRMvlA"
-msgid "Exchange rate pending"
-msgstr "為替レート保留中"
 
 #: components/transactions/unconverted-transactions-alert.tsx
 msgctxt "bBbh-Z"
