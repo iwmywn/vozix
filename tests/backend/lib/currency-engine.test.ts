@@ -17,7 +17,6 @@ import {
   InMemoryExchangeRateAdapter,
   reconcileMissingRatesQueue,
 } from "@/lib/currency-engine"
-import { addDays, normalizeToUTCMidnight } from "@/lib/date"
 import type { ExchangeRate, Transaction } from "@/lib/definitions"
 
 describe("CurrencyEngine", () => {
@@ -252,21 +251,106 @@ describe("CurrencyEngine", () => {
       expect(queued?.retryCount).toBe(1)
     })
 
-    it("should enqueue dates omitted by maxDatesPerRun for a later run without incrementing retryCount", async () => {
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = addDays(todayUTC, -1)
+    it("should return early when missing rates queue is empty without querying exchange rates or calling provider", async () => {
+      const adapter = new InMemoryExchangeRateAdapter()
+      const fetchSpy = vi.spyOn(adapter, "fetchRates")
+      const exchangeRatesCollection = await getExchangeRatesCollection()
+      const findSpy = vi.spyOn(exchangeRatesCollection, "find")
+      const missingRatesCollection = await getMissingExchangeRatesCollection()
+      const updateSpy = vi.spyOn(missingRatesCollection, "updateMany")
+      const deleteSpy = vi.spyOn(missingRatesCollection, "deleteMany")
 
-      const olderDate = addDays(yesterdayUTC, -10)
+      const summary = await reconcileMissingRatesQueue({
+        provider: adapter,
+      })
+
+      expect(summary.success).toBe(true)
+      expect(summary.checkedCount).toBe(0)
+      expect(summary.missingCount).toBe(0)
+      expect(summary.batchCount).toBe(0)
+      expect(summary.syncedCount).toBe(0)
+      expect(summary.remainingCount).toBe(0)
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(findSpy).not.toHaveBeenCalled()
+      expect(updateSpy).not.toHaveBeenCalled()
+      expect(deleteSpy).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      {
+        initialRetryCount: 0,
+        expectedRetryCount: 0,
+        description: "leaving remaining dates untouched",
+      },
+      {
+        initialRetryCount: 3,
+        expectedRetryCount: 3,
+        description: "not incrementing retryCount for omitted queued dates",
+      },
+    ])(
+      "should process oldest queued dates up to maxDatesPerRun ($description)",
+      async ({ initialRetryCount, expectedRetryCount }) => {
+        const olderDate = new Date("2024-01-01T00:00:00Z")
+        const newerDate = new Date("2024-01-02T00:00:00Z")
+        await insertTestMissingExchangeRate({
+          _id: new ObjectId(),
+          date: olderDate,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          retryCount: 0,
+        })
+        await insertTestMissingExchangeRate({
+          _id: new ObjectId(),
+          date: newerDate,
+          createdAt: new Date("2024-01-02T00:00:00Z"),
+          retryCount: initialRetryCount,
+        })
+
+        const adapter = new InMemoryExchangeRateAdapter({
+          [olderDate.toISOString().split("T")[0]]: {
+            USD: 1,
+            VND: 25000,
+            JPY: 150,
+            CNY: 7,
+            KRW: 1300,
+          },
+        })
+
+        const summary = await reconcileMissingRatesQueue({
+          maxDatesPerRun: 1,
+          provider: adapter,
+        })
+
+        expect(summary.batchCount).toBe(1)
+        expect(summary.syncedCount).toBe(1)
+
+        const missingCollection = await getMissingExchangeRatesCollection()
+        const queuedDoc = await missingCollection.findOne({
+          date: newerDate,
+        })
+        expect(queuedDoc).not.toBeNull()
+        expect(queuedDoc?.retryCount).toBe(expectedRetryCount)
+      }
+    )
+
+    it("should mark exhausted retries as failed without consuming batch slots for retryable dates", async () => {
+      const exhaustedDate = new Date("2024-01-01T00:00:00Z")
+      const retryableDate = new Date("2024-01-02T00:00:00Z")
+
       await insertTestMissingExchangeRate({
         _id: new ObjectId(),
-        date: olderDate,
-        createdAt: new Date(),
+        date: exhaustedDate,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        retryCount: 6,
+      })
+      await insertTestMissingExchangeRate({
+        _id: new ObjectId(),
+        date: retryableDate,
+        createdAt: new Date("2024-01-02T00:00:00Z"),
         retryCount: 0,
       })
 
       const adapter = new InMemoryExchangeRateAdapter({
-        [olderDate.toISOString().split("T")[0]]: {
+        "2024-01-02": {
           USD: 1,
           VND: 25000,
           JPY: 150,
@@ -282,30 +366,39 @@ describe("CurrencyEngine", () => {
 
       expect(summary.batchCount).toBe(1)
       expect(summary.syncedCount).toBe(1)
+      expect(summary.remainingCount).toBe(0)
 
       const missingCollection = await getMissingExchangeRatesCollection()
-      const queuedYesterday = await missingCollection.findOne({
-        date: yesterdayUTC,
+      const exhaustedDoc = await missingCollection.findOne({
+        date: exhaustedDate,
       })
-      expect(queuedYesterday).not.toBeNull()
-      expect(queuedYesterday?.retryCount).toBe(0)
+      expect(exhaustedDoc?.status).toBe("failed")
+
+      const retryableDoc = await missingCollection.findOne({
+        date: retryableDate,
+      })
+      expect(retryableDoc).toBeNull()
     })
 
-    it("should not increment retryCount for omitted queued date", async () => {
-      const now = new Date()
-      const todayUTC = normalizeToUTCMidnight(now)
-      const yesterdayUTC = addDays(todayUTC, -1)
+    it("should mark exhausted retries as failed across the entire queue even beyond maxDatesPerRun", async () => {
+      const retryableDate = new Date("2024-01-01T00:00:00Z")
+      const exhaustedDate = new Date("2024-01-02T00:00:00Z")
 
-      const newerQueuedDate = addDays(yesterdayUTC, 10)
       await insertTestMissingExchangeRate({
         _id: new ObjectId(),
-        date: newerQueuedDate,
-        createdAt: new Date(),
-        retryCount: 3,
+        date: retryableDate,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        retryCount: 0,
+      })
+      await insertTestMissingExchangeRate({
+        _id: new ObjectId(),
+        date: exhaustedDate,
+        createdAt: new Date("2024-01-02T00:00:00Z"),
+        retryCount: 6,
       })
 
       const adapter = new InMemoryExchangeRateAdapter({
-        [yesterdayUTC.toISOString().split("T")[0]]: {
+        "2024-01-01": {
           USD: 1,
           VND: 25000,
           JPY: 150,
@@ -321,13 +414,13 @@ describe("CurrencyEngine", () => {
 
       expect(summary.batchCount).toBe(1)
       expect(summary.syncedCount).toBe(1)
+      expect(summary.remainingCount).toBe(0)
 
       const missingCollection = await getMissingExchangeRatesCollection()
-      const queuedDoc = await missingCollection.findOne({
-        date: newerQueuedDate,
+      const exhaustedDoc = await missingCollection.findOne({
+        date: exhaustedDate,
       })
-      expect(queuedDoc).not.toBeNull()
-      expect(queuedDoc?.retryCount).toBe(3)
+      expect(exhaustedDoc?.status).toBe("failed")
     })
   })
 })

@@ -12,7 +12,8 @@ import {
 } from "@/lib/collections"
 import { convertAmountWithRates, CURRENCIES } from "@/lib/currency"
 import type { Currency } from "@/lib/currency"
-import { addDays, normalizeToUTCMidnight } from "@/lib/date"
+import { normalizeToUTCMidnight } from "@/lib/date"
+import { withTransaction } from "@/lib/db"
 import type {
   DBExchangeRate,
   ExchangeRate,
@@ -352,9 +353,43 @@ export const currencyEngine = {
   reconcileMissingRatesQueue,
 }
 
+const MAX_QUEUE_RETRIES = 6
+
+type MissingRatesCollection = Awaited<
+  ReturnType<typeof getMissingExchangeRatesCollection>
+>
+
+async function markExhaustedRetriesAsFailed(
+  collection: MissingRatesCollection
+): Promise<void> {
+  await withTransaction(async (session) => {
+    await collection.updateMany(
+      { retryCount: { $gte: MAX_QUEUE_RETRIES }, status: { $ne: "failed" } },
+      { $set: { status: "failed", failedAt: new Date() } },
+      { session }
+    )
+  })
+}
+
+function buildQueueResult(
+  overrides: Partial<QueueSyncResult> = {}
+): QueueSyncResult {
+  return {
+    success: true,
+    checkedCount: 0,
+    missingCount: 0,
+    batchCount: 0,
+    syncedCount: 0,
+    remainingCount: 0,
+    errors: [],
+    timestamp: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
 /**
  * Reconciles missing exchange rates from the queue:
- * - Checks yesterday and queued dates up to retry limit
+ * - Checks queued dates from missing rates queue up to retry limit
  * - Syncs missing rates from provider
  * - Invalidates transactions cache for affected users
  * - Updates failure status for exhausted retries
@@ -369,27 +404,49 @@ export async function reconcileMissingRatesQueue(
     getExchangeRatesCollection(),
   ])
 
-  const now = new Date()
-  const todayUTC = normalizeToUTCMidnight(now)
-  const yesterdayUTC = addDays(todayUTC, -1)
+  // Check if there are any unfailed queued records at all
+  const hasQueuedDocs = await missingRatesCollection.findOne({
+    status: { $ne: "failed" },
+  })
 
-  const datesToCheck = new Set<number>()
-  datesToCheck.add(yesterdayUTC.getTime())
+  if (!hasQueuedDocs) {
+    return buildQueueResult()
+  }
 
-  // Only process queued docs that have not failed 6 times
-  const queuedDocs = await missingRatesCollection
+  // Mark any exhausted retries across the queue as failed
+  const hasExhaustedRetries = await missingRatesCollection.findOne({
+    retryCount: { $gte: MAX_QUEUE_RETRIES },
+    status: { $ne: "failed" },
+  })
+
+  if (hasExhaustedRetries) {
+    await markExhaustedRetriesAsFailed(missingRatesCollection)
+  }
+
+  // Fetch up to maxDatesPerRun retryable records
+  const retryableDocs = await missingRatesCollection
     .find({
       status: { $ne: "failed" },
-      $or: [{ retryCount: { $lt: 6 } }, { retryCount: { $exists: false } }],
+      $or: [
+        { retryCount: { $lt: MAX_QUEUE_RETRIES } },
+        { retryCount: { $exists: false } },
+      ],
     })
     .sort({ createdAt: 1 })
     .limit(maxDatesPerRun)
     .toArray()
 
-  for (const doc of queuedDocs) {
-    if (doc?.date) {
-      datesToCheck.add(normalizeToUTCMidnight(new Date(doc.date)).getTime())
-    }
+  if (retryableDocs.length === 0) {
+    const remainingCount = await missingRatesCollection.countDocuments({
+      status: { $ne: "failed" },
+    })
+    return buildQueueResult({ remainingCount })
+  }
+
+  const datesToCheck = new Set<number>()
+
+  for (const doc of retryableDocs) {
+    datesToCheck.add(normalizeToUTCMidnight(new Date(doc.date)).getTime())
   }
 
   const nonUSDCurrencies = CURRENCIES.filter((c) => c !== "USD")
@@ -420,20 +477,15 @@ export async function reconcileMissingRatesQueue(
 
   // Clean up any queued records whose exchange rates are already fully resolved
   if (resolvedDates.length > 0) {
-    await missingRatesCollection.deleteMany({
-      date: { $in: resolvedDates },
+    await withTransaction(async (session) => {
+      await missingRatesCollection.deleteMany(
+        { date: { $in: resolvedDates } },
+        { session }
+      )
     })
   }
 
   missingDates.sort((a, b) => a.getTime() - b.getTime())
-  const datesToSync = missingDates.slice(0, maxDatesPerRun)
-  const omittedDates = missingDates.slice(maxDatesPerRun)
-
-  if (omittedDates.length > 0) {
-    await Promise.all(
-      omittedDates.map((d) => currencyEngine.enqueueMissingExchangeRateDate(d))
-    )
-  }
 
   let syncedCount = 0
   const successfullySyncedDates: Date[] = []
@@ -444,7 +496,7 @@ export async function reconcileMissingRatesQueue(
     | { success: false; date: Date; error: string }
 
   const syncResults = await Promise.allSettled(
-    datesToSync.map(async (d): Promise<SyncItemResult> => {
+    missingDates.map(async (d): Promise<SyncItemResult> => {
       try {
         await currencyEngine.ensureExchangeRateForDate(d, provider)
         await missingRatesCollection.deleteOne({ date: d })
@@ -464,7 +516,7 @@ export async function reconcileMissingRatesQueue(
 
   for (let i = 0; i < syncResults.length; i++) {
     const res = syncResults[i]
-    const dateStr = datesToSync[i].toISOString().split("T")[0] as string
+    const dateStr = missingDates[i].toISOString().split("T")[0] as string
     if (res.status === "fulfilled") {
       if (res.value.success) {
         syncedCount++
@@ -508,24 +560,21 @@ export async function reconcileMissingRatesQueue(
     }
   }
 
-  // Mark any dates that just reached retryCount >= 6 as failed
-  await missingRatesCollection.updateMany(
-    { retryCount: { $gte: 6 }, status: { $ne: "failed" } },
-    { $set: { status: "failed", failedAt: new Date() } }
-  )
+  // Mark any dates that just reached retryCount >= MAX_QUEUE_RETRIES as failed
+  if (errors.length > 0) {
+    await markExhaustedRetriesAsFailed(missingRatesCollection)
+  }
 
-  const remainingQueueCount = await missingRatesCollection.countDocuments({
+  const remainingCount = await missingRatesCollection.countDocuments({
     status: { $ne: "failed" },
   })
 
-  return {
-    success: true,
+  return buildQueueResult({
     checkedCount: datesToCheck.size,
     missingCount: missingDates.length,
-    batchCount: datesToSync.length,
+    batchCount: missingDates.length,
     syncedCount,
-    remainingCount: remainingQueueCount,
+    remainingCount,
     errors,
-    timestamp: new Date().toISOString(),
-  }
+  })
 }
