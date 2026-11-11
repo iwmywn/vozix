@@ -102,6 +102,14 @@ export function buildSchemas(messages: SchemaMessages) {
       .transform((date) => parseToUTCMidnight(date) ?? date)
       .optional()
 
+  const baseCategoryKeySchema = () =>
+    z
+      .string()
+      .min(1, { message: messages.categoryRequired })
+      .transform((val) =>
+        /^[0-9a-fA-F]{24}$/.test(val) ? val.toLowerCase() : val
+      )
+
   const createSignInSchema = () =>
     z.object({
       username: z.string().min(1, { message: messages.usernameRequired }),
@@ -171,7 +179,7 @@ export function buildSchemas(messages: SchemaMessages) {
         type: z.enum(CATEGORY_TYPES, {
           message: messages.transactionTypeRequired,
         }),
-        categoryKey: z.string().min(1, { message: messages.categoryRequired }),
+        categoryKey: baseCategoryKeySchema(),
         currency: z.enum(CURRENCIES, {
           message: messages.currencyRequired,
         }),
@@ -227,7 +235,7 @@ export function buildSchemas(messages: SchemaMessages) {
   const createBudgetSchema = () =>
     z
       .object({
-        categoryKey: z.string().min(1, { message: messages.categoryRequired }),
+        categoryKey: baseCategoryKeySchema(),
         currency: z.enum(CURRENCIES, {
           message: messages.currencyRequired,
         }),
@@ -261,7 +269,7 @@ export function buildSchemas(messages: SchemaMessages) {
           .max(100, {
             message: messages.goalNameMaxLength,
           }),
-        categoryKey: z.string().min(1, { message: messages.categoryRequired }),
+        categoryKey: baseCategoryKeySchema(),
         currency: z.enum(CURRENCIES, {
           message: messages.currencyRequired,
         }),
@@ -291,7 +299,7 @@ export function buildSchemas(messages: SchemaMessages) {
         type: z.enum(CATEGORY_TYPES, {
           message: messages.typeRequired,
         }),
-        categoryKey: z.string().min(1, { message: messages.categoryRequired }),
+        categoryKey: baseCategoryKeySchema(),
         currency: z.enum(CURRENCIES, {
           message: messages.currencyRequired,
         }),

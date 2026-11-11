@@ -26,7 +26,7 @@ const OUTFLOW_CATEGORIES_KEY = [
   "other_outflow",
 ] as const
 
-const ALL_PREDEFINED_CATEGORIES_KEY = [
+export const ALL_PREDEFINED_CATEGORIES_KEY = [
   ...INFLOW_CATEGORIES_KEY,
   ...OUTFLOW_CATEGORIES_KEY,
 ] as const

@@ -6,9 +6,9 @@ import { ObjectId } from "mongodb"
 import { getExtracted } from "next-intl/server"
 import type { z } from "zod"
 
-import { isValidUserCategory } from "@/actions/category.server"
 import { getSession } from "@/actions/session.actions"
 import type { CategoryType } from "@/lib/category"
+import { CategoryEngine } from "@/lib/category-engine"
 import type { ActionResponse, Session, User } from "@/lib/definitions"
 import { isDuplicateKeyError } from "@/lib/indexes"
 import { isRateLimited, RATE_LIMIT_PRESETS } from "@/lib/rate-limit"
@@ -226,7 +226,7 @@ export async function runDomainMutation<TParsed, TOutput = void>(
     if (config.categoryCheck) {
       const check = config.categoryCheck(parsedData, user)
       if (check) {
-        const isValid = await isValidUserCategory(
+        const isValid = await CategoryEngine.isValidCategory(
           user.id,
           check.key,
           check.expectedType
