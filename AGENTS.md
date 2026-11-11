@@ -49,3 +49,17 @@ Load specialized skills when entering these distinct workflow branches:
 - **Bug Diagnosis**: [.agents/skills/diagnosing-bugs/SKILL.md](.agents/skills/diagnosing-bugs/SKILL.md) — When troubleshooting unexpected errors, memory leaks, or flaky tests.
 - **Code Review**: [.agents/skills/code-review/SKILL.md](.agents/skills/code-review/SKILL.md) — When evaluating branch changes against repo standards and functional specs.
 - **Deep Module Architecture**: [.agents/skills/codebase-design/SKILL.md](.agents/skills/codebase-design/SKILL.md) — When designing interface seams, modularizing logic, or refactoring services.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five canonical triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (`GLOSSARY.md` and `docs/adr/` at the repo root). See `docs/agents/domain.md`.
