@@ -1,5 +1,6 @@
 "use server"
 
+import { cacheTag } from "next/cache"
 import { getExtracted } from "next-intl/server"
 import { z } from "zod"
 
@@ -157,12 +158,17 @@ export async function getCustomCategories(): Promise<{
     return { error }
   }
 
+  return getCachedCustomCategories(user.id)
+}
+
+async function getCachedCustomCategories(userId: string) {
+  "use cache: private"
+  cacheTag(`categories-${userId}`)
+
   const t = await getExtracted()
 
   try {
-    const customCategories = await CategoryEngine.getCachedCustomCategories(
-      user.id
-    )
+    const customCategories = await CategoryEngine.getCustomCategories(userId)
     return { customCategories }
   } catch (error) {
     console.error("Error fetching custom categories:", error)

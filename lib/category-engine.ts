@@ -1,6 +1,5 @@
 import "server-only"
 
-import { cacheTag } from "next/cache"
 import { ObjectId } from "mongodb"
 import type { ClientSession } from "mongodb"
 
@@ -102,7 +101,7 @@ export async function isValidCategory(
 /**
  * Resolves category details by identifier, unified across predefined and user custom categories.
  * Predefined categories resolve purely in memory without hitting the database.
- * Custom categories are looked up from the user's cached category list.
+ * Custom categories are looked up via user-scoped direct query on the primary key.
  */
 export async function resolveCategory(
   userId: string,
@@ -123,16 +122,21 @@ export async function resolveCategory(
     return null
   }
 
-  const customCategories = await getCachedCustomCategories(userId)
-  const normalizedKey = new ObjectId(categoryKey).toHexString()
-  const custom = customCategories.find((c) => c._id === normalizedKey)
+  const categoriesCollection = await getCategoriesCollection()
+  const custom = await categoriesCollection.findOne(
+    {
+      _id: new ObjectId(categoryKey),
+      userId: new ObjectId(userId),
+    },
+    { projection: { _id: 1, label: 1, description: 1, type: 1 } }
+  )
 
   if (!custom) {
     return null
   }
 
   return {
-    key: custom._id,
+    key: custom._id.toString(),
     label: custom.label,
     description: custom.description,
     type: custom.type,
@@ -146,7 +150,7 @@ export async function resolveCategory(
 export async function getCategoryCatalog(
   userId: string
 ): Promise<CatalogCategory[]> {
-  const customCategories = await getCachedCustomCategories(userId)
+  const customCategories = await getCustomCategories(userId)
 
   const predefined: CatalogCategory[] = ALL_PREDEFINED_CATEGORIES_KEY.map(
     (key) => ({
@@ -400,13 +404,12 @@ export async function updateCustomCategory(
 }
 
 /**
- * Retrieves cached custom categories for a user, sorted descending by creation id.
+ * Retrieves custom categories for a user, sorted descending by creation id.
  */
-export async function getCachedCustomCategories(
-  userId: string
-): Promise<Category[]> {
-  "use cache: private"
-  cacheTag(`categories-${userId}`)
+export async function getCustomCategories(userId: string): Promise<Category[]> {
+  if (!ObjectId.isValid(userId)) {
+    return []
+  }
 
   const categoriesCollection = await getCategoriesCollection()
   const categories = await categoriesCollection
@@ -421,6 +424,8 @@ export async function getCachedCustomCategories(
   })) as Category[]
 }
 
+export const getCachedCustomCategories = getCustomCategories
+
 /**
  * Unified CategoryEngine domain facade.
  * Callers interact with all category capabilities through this single seam.
@@ -433,5 +438,6 @@ export const CategoryEngine = {
   deleteCustomCategory,
   createCustomCategory,
   updateCustomCategory,
+  getCustomCategories,
   getCachedCustomCategories,
 }
