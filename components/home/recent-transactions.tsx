@@ -8,14 +8,14 @@ import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { useTransactions } from "@/contexts/transactions-context"
+import { usePageTransactions } from "@/contexts/page-data-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
 import { getFlowColorClass } from "@/lib/utils"
 
 export function RecentTransactions() {
-  const { transactions } = useTransactions()
+  const transactions = usePageTransactions()
   const recentTransactions = transactions.slice(0, 10)
   const t = useExtracted()
   const { getCategoryLabel } = useCategory()

@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useTransactions } from "@/contexts/transactions-context"
+import { usePageTransactions } from "@/contexts/page-data-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatDate } from "@/hooks/use-format-date"
 import { useMonths } from "@/hooks/use-months"
@@ -46,7 +46,7 @@ import {
 import type { FlowTypeFilter, TransactionFilterAction } from "@/lib/filters"
 
 export function TransactionFilters() {
-  const { transactions } = useTransactions()
+  const transactions = usePageTransactions()
   const t = useExtracted()
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false)
   const [isDateRangeOpen, setIsDateRangeOpen] = useState<boolean>(false)
@@ -427,6 +427,7 @@ export function TransactionFilters() {
       <TransactionsTable
         filteredTransactions={filteredTransactions}
         filterKey={getTransactionFilterKey(filterState)}
+        isTotalEmpty={transactions.length === 0}
       />
     </>
   )

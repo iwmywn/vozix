@@ -9,13 +9,13 @@ import { TransactionSummary } from "@/components/home/transaction-summary"
 import { PageLayout } from "@/components/layout/page-layout"
 import { TransactionForm } from "@/components/transactions/transaction-form"
 import { Button } from "@/components/ui/button"
-import { useTransactions } from "@/contexts/transactions-context"
+import { usePageTransactions } from "@/contexts/page-data-context"
 import { useUser } from "@/contexts/user-context"
 import type { Currency } from "@/lib/currency"
 import { FinancialRollupEngine } from "@/lib/valuation-engine"
 
 export default function HomePage() {
-  const { transactions } = useTransactions()
+  const transactions = usePageTransactions()
   const { user } = useUser()
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const t = useExtracted()

@@ -28,7 +28,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useRecurring } from "@/contexts/recurring-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
@@ -38,12 +37,13 @@ import { getScheduleStatusClass } from "@/lib/utils"
 
 interface RecurringTableProps {
   evaluatedSchedules: EvaluatedRecurringSchedule[]
+  isTotalEmpty?: boolean
 }
 
 export function RecurringTransactionsTable({
   evaluatedSchedules,
+  isTotalEmpty,
 }: RecurringTableProps) {
-  const { recurringTransactions } = useRecurring()
   const [selectedRecurring, setSelectedRecurring] =
     useState<RecurringTransaction | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
@@ -88,7 +88,7 @@ export function RecurringTransactionsTable({
               icon={<RepeatIcon />}
               title={t("No recurring transactions found")}
               description={
-                recurringTransactions.length === 0
+                isTotalEmpty
                   ? t("You haven't created any recurring transactions yet.")
                   : t("No recurring transactions found matching your filters.")
               }

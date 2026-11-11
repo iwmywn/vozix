@@ -2,7 +2,7 @@
 
 import { useExtracted } from "next-intl"
 
-import { useCategories } from "@/contexts/categories-context"
+import { usePageCategories } from "@/contexts/page-data-context"
 import { getCategoryType } from "@/lib/category"
 import type {
   CategoryConfig,
@@ -13,7 +13,7 @@ import type {
 
 export function useCategory() {
   const t = useExtracted()
-  const { customCategories } = useCategories()
+  const customCategories = usePageCategories()
 
   const CATEGORY_CONFIG: CategoryConfig = {
     // Inflows

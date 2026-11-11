@@ -23,8 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useGoals } from "@/contexts/goals-context"
-import { useTransactions } from "@/contexts/transactions-context"
+import { usePageGoals, usePageTransactions } from "@/contexts/page-data-context"
 import { useCategory } from "@/hooks/use-category"
 import { useMonths } from "@/hooks/use-months"
 import type { CategoryKey } from "@/lib/category"
@@ -34,8 +33,8 @@ import { FinancialRollupEngine } from "@/lib/valuation-engine"
 import type { RollupHealth } from "@/lib/valuation-engine"
 
 export function GoalFilters() {
-  const { goals } = useGoals()
-  const { transactions } = useTransactions()
+  const goals = usePageGoals()
+  const transactions = usePageTransactions()
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [filterMonth, setFilterMonth] = useState<string>("all")
   const [filterYear, setFilterYear] = useState<string>("all")
@@ -269,7 +268,7 @@ export function GoalFilters() {
         </CardContent>
       </Card>
 
-      <GoalsTable valuations={valuations} />
+      <GoalsTable valuations={valuations} isTotalEmpty={goals.length === 0} />
     </>
   )
 }

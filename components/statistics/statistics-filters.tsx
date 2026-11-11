@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useTransactions } from "@/contexts/transactions-context"
+import { usePageTransactions } from "@/contexts/page-data-context"
 import { useUser } from "@/contexts/user-context"
 import { useFormatDate } from "@/hooks/use-format-date"
 import { useMonths } from "@/hooks/use-months"
@@ -39,7 +39,7 @@ import type { TemporalFilterAction } from "@/lib/filters"
 import { FinancialRollupEngine } from "@/lib/valuation-engine"
 
 export function StatisticsFilters() {
-  const { transactions } = useTransactions()
+  const transactions = usePageTransactions()
   const { user } = useUser()
   const t = useExtracted()
   const timeZone = useTimeZone()
@@ -255,6 +255,7 @@ export function StatisticsFilters() {
         valuations={valuations}
         hasUnconverted={summary.unconvertedCount > 0}
         filterStates={temporalState}
+        isTotalEmpty={transactions.length === 0}
       />
     </>
   )
