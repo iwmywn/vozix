@@ -36,8 +36,8 @@ import { useBudgets } from "@/contexts/budgets-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
-import { serializeUTCDate } from "@/lib/date"
 import type { Budget } from "@/lib/definitions"
+import { buildTransactionsHref } from "@/lib/filters"
 import { getRollupHealthClass, getScheduleStatusClass } from "@/lib/utils"
 import type { BudgetValuation } from "@/lib/valuation-engine"
 
@@ -171,7 +171,16 @@ export function BudgetsTable({ valuations }: BudgetsTableProps) {
                             {valuation.matchingTransactions.length > 0 && (
                               <DropdownMenuItem asChild>
                                 <Link
-                                  href={`/transactions?from=${serializeUTCDate(valuation.budget.startDate)}&to=${serializeUTCDate(valuation.budget.endDate)}&type=outflow&category=${valuation.budget.categoryKey}`}
+                                  href={buildTransactionsHref({
+                                    dateRange: {
+                                      from: valuation.budget.startDate,
+                                      to: valuation.budget.endDate,
+                                    },
+                                    dateMode: "utc",
+                                    filterType: "outflow",
+                                    filterCategoryKey:
+                                      valuation.budget.categoryKey,
+                                  })}
                                 >
                                   {t("View")}
                                 </Link>

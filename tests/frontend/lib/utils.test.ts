@@ -1,5 +1,4 @@
 import { mockTransactions } from "@/tests/shared/data"
-import { sanitizeCSVField } from "@/components/transactions/export-button"
 import { convertAmountWithRates, formatCurrency } from "@/lib/currency"
 import { getUniqueDateRangeYears, getUniqueYears } from "@/lib/date"
 import {
@@ -170,24 +169,6 @@ describe("Utils", () => {
     })
   })
 
-  describe("sanitizeCSVField", () => {
-    it("should quote normal fields and escape double quotes", () => {
-      expect(sanitizeCSVField("Grocery")).toBe('"Grocery"')
-      expect(sanitizeCSVField('Dinner "with" friends')).toBe(
-        '"Dinner ""with"" friends"'
-      )
-    })
-
-    it("should prefix formulas with single quote to prevent CSV injection", () => {
-      expect(sanitizeCSVField("=SUM(A1:A10)")).toBe('"\'=SUM(A1:A10)"')
-      expect(sanitizeCSVField("+12345")).toBe('"\' +12345"'.replace(" ", ""))
-      expect(sanitizeCSVField("-100")).toBe('"\' -100"'.replace(" ", ""))
-      expect(sanitizeCSVField("@SUM")).toBe('"\'@SUM"')
-      expect(sanitizeCSVField("\tCMD")).toBe('"\'\tCMD"')
-      expect(sanitizeCSVField("\rCMD")).toBe('"\'\rCMD"')
-    })
-  })
-
   describe("convertAmountWithRates", () => {
     const mockRates = {
       USD: "1",
@@ -346,26 +327,6 @@ describe("Utils", () => {
       expect(
         isUserBanned({ banned: true, banExpires: "invalid-date" }, fixedNow)
       ).toBe(true)
-    })
-  })
-
-  describe("sanitizeCSVField", () => {
-    it("should safely handle null and undefined without throwing", () => {
-      expect(sanitizeCSVField(null)).toBe('""')
-      expect(sanitizeCSVField(undefined)).toBe('""')
-    })
-
-    it("should escape formula trigger characters with leading quote", () => {
-      expect(sanitizeCSVField("=SUM(A1:A10)")).toBe(`"'=SUM(A1:A10)"`)
-      expect(sanitizeCSVField("+1234")).toBe(`"'+1234"`)
-      expect(sanitizeCSVField("-5000")).toBe(`"'-5000"`)
-      expect(sanitizeCSVField("@test")).toBe(`"'@test"`)
-      expect(sanitizeCSVField("\ttab")).toBe(`"'\ttab"`)
-      expect(sanitizeCSVField("\rreturn")).toBe(`"'\rreturn"`)
-    })
-
-    it("should escape double quotes properly", () => {
-      expect(sanitizeCSVField('Hello "World"')).toBe(`"Hello ""World"""`)
     })
   })
 

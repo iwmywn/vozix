@@ -36,8 +36,8 @@ import { useGoals } from "@/contexts/goals-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
-import { serializeUTCDate } from "@/lib/date"
 import type { Goal } from "@/lib/definitions"
+import { buildTransactionsHref } from "@/lib/filters"
 import { getRollupHealthClass, getScheduleStatusClass } from "@/lib/utils"
 import type { GoalValuation } from "@/lib/valuation-engine"
 
@@ -164,7 +164,16 @@ export function GoalsTable({ valuations }: GoalsTableProps) {
                             {valuation.matchingTransactions.length > 0 && (
                               <DropdownMenuItem asChild>
                                 <Link
-                                  href={`/transactions?from=${serializeUTCDate(valuation.goal.startDate)}&to=${serializeUTCDate(valuation.goal.endDate)}&type=inflow&category=${valuation.goal.categoryKey}`}
+                                  href={buildTransactionsHref({
+                                    dateRange: {
+                                      from: valuation.goal.startDate,
+                                      to: valuation.goal.endDate,
+                                    },
+                                    dateMode: "utc",
+                                    filterType: "inflow",
+                                    filterCategoryKey:
+                                      valuation.goal.categoryKey,
+                                  })}
                                 >
                                   {t("View")}
                                 </Link>

@@ -15,19 +15,10 @@ import {
 import { useCategory } from "@/hooks/use-category"
 import { useFormatDate } from "@/hooks/use-format-date"
 import type { Transaction } from "@/lib/definitions"
+import { buildTransactionsCSVExport } from "@/lib/filters"
 
 interface ExportButtonProps {
   filteredTransactions: Transaction[]
-}
-
-export function sanitizeCSVField(
-  value: string | number | null | undefined
-): string {
-  let sanitized = String(value ?? "")
-  if (/^[=+\-@\t\r]/.test(sanitized)) {
-    sanitized = `'${sanitized}`
-  }
-  return `"${sanitized.replace(/"/g, '""')}"`
 }
 
 export function ExportButton({ filteredTransactions }: ExportButtonProps) {
@@ -35,49 +26,6 @@ export function ExportButton({ filteredTransactions }: ExportButtonProps) {
   const t = useExtracted()
   const formatDate = useFormatDate()
   const { getCategoryLabel } = useCategory()
-
-  function formatTransactionsToCSV(
-    filteredTransactions: Transaction[]
-  ): string {
-    const headers = [
-      sanitizeCSVField(t("Date")),
-      sanitizeCSVField(t("Type")),
-      sanitizeCSVField(t("Category")),
-      sanitizeCSVField(t("Amount")),
-      sanitizeCSVField(t("Currency")),
-      sanitizeCSVField(t("Original Amount")),
-      sanitizeCSVField(t("Original Currency")),
-      sanitizeCSVField(t("Description")),
-    ]
-    const rows = filteredTransactions.map((ft) => {
-      const date = sanitizeCSVField(formatDate(ft.date))
-      const type = sanitizeCSVField(
-        ft.type === "inflow" ? t("Inflow") : t("Outflow")
-      )
-      const category = sanitizeCSVField(getCategoryLabel(ft.categoryKey))
-      const amount = sanitizeCSVField(ft.amount.toString())
-      const currency = sanitizeCSVField(ft.currency)
-      const originalAmount = sanitizeCSVField(
-        (ft.originalAmount ?? ft.amount).toString()
-      )
-      const originalCurrency = sanitizeCSVField(
-        ft.originalCurrency ?? ft.currency
-      )
-      const description = sanitizeCSVField(ft.description)
-      return [
-        date,
-        type,
-        category,
-        amount,
-        currency,
-        originalAmount,
-        originalCurrency,
-        description,
-      ]
-    })
-
-    return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n")
-  }
 
   function handleExport() {
     if (filteredTransactions.length === 0) {
@@ -87,29 +35,30 @@ export function ExportButton({ filteredTransactions }: ExportButtonProps) {
 
     startTransition(() => {
       try {
-        const csvContent = formatTransactionsToCSV(filteredTransactions)
-        let dateStr: string = ""
-
-        if (filteredTransactions.length === 1) {
-          dateStr = formatDate(filteredTransactions[0].date)
-        } else if (filteredTransactions.length > 1) {
-          let minTime = Infinity
-          let maxTime = -Infinity
-          for (const t of filteredTransactions) {
-            const time = new Date(t.date).getTime()
-            if (time < minTime) minTime = time
-            if (time > maxTime) maxTime = time
+        const { csvContent, filename } = buildTransactionsCSVExport(
+          filteredTransactions,
+          {
+            labels: {
+              headers: {
+                date: t("Date"),
+                type: t("Type"),
+                category: t("Category"),
+                amount: t("Amount"),
+                currency: t("Currency"),
+                originalAmount: t("Original Amount"),
+                originalCurrency: t("Original Currency"),
+                description: t("Description"),
+              },
+              inflow: t("Inflow"),
+              outflow: t("Outflow"),
+              from: t("From"),
+              to: t("To"),
+              filenamePrefix: t("transactions"),
+            },
+            formatDate,
+            getCategoryLabel,
           }
-          const minDate = new Date(minTime)
-          const maxDate = new Date(maxTime)
-          const fromDateStr = formatDate(minDate)
-          const toDateStr = formatDate(maxDate)
-          dateStr = `${t("From")}_${fromDateStr}_${t("To")}_${toDateStr}`
-        }
-
-        const filename = `${t("transactions")}_${dateStr}.csv`
-          .replace(/[/\\?%*:|"<> ]+/g, "_")
-          .toLowerCase()
+        )
 
         // Add UTF-8 BOM for proper encoding in Excel
         const BOM = "\uFEFF"

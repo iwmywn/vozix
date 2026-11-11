@@ -6,10 +6,19 @@ import {
 import { isDateRangeOverlapping } from "@/lib/date"
 import type { User } from "@/lib/definitions"
 import {
+  applyTemporalFilterChange,
+  applyTransactionFilterChange,
+  buildTransactionsCSVExport,
+  buildTransactionsHref,
   filterCustomCategories,
   filterTransactions,
   filterUsers,
+  getTransactionFilterKey,
+  hasActiveTemporalFilters,
+  hasActiveTransactionFilters,
+  parseAsLocalDate,
 } from "@/lib/filters"
+import type { FlowTypeFilter, TransactionFilterState } from "@/lib/filters"
 
 describe("Filters", () => {
   describe("isDateRangeOverlapping", () => {
@@ -573,6 +582,748 @@ describe("Filters", () => {
       })
       expect(bannedResult).toHaveLength(1)
       expect(bannedResult[0].id).toBe("user-active-ban")
+    })
+
+    it("should treat user as banned when provided current timestamp is before ban expiration", () => {
+      const userWithBanAt1230: User = {
+        ...mockUsers[0],
+        id: "user-ban-1230",
+        banned: true,
+        banExpires: new Date("2026-06-15T12:30:00Z"),
+      }
+
+      expect(
+        filterUsers([userWithBanAt1230], {
+          filterStatus: "banned",
+          now: new Date("2026-06-15T12:00:00Z"),
+        })
+      ).toHaveLength(1)
+    })
+
+    it("should exclude user from banned filter when provided current timestamp is after ban expiration", () => {
+      const userWithBanAt1230: User = {
+        ...mockUsers[0],
+        id: "user-ban-1230",
+        banned: true,
+        banExpires: new Date("2026-06-15T12:30:00Z"),
+      }
+
+      expect(
+        filterUsers([userWithBanAt1230], {
+          filterStatus: "banned",
+          now: new Date("2026-06-15T13:00:00Z"),
+        })
+      ).toHaveLength(0)
+    })
+  })
+
+  describe("Temporal & Transaction Filter State Machine", () => {
+    const jan10 = new Date(2026, 0, 10)
+    const jan20 = new Date(2026, 0, 20)
+    const jan25 = new Date(2026, 0, 25)
+
+    it("should clear dateRange, filterMonth, and filterYear when selecting a single date", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: undefined,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "1",
+          filterYear: "2026",
+        },
+        { type: "selectDate", date: jan25 }
+      )
+
+      expect(next).toEqual({
+        selectedDate: jan25,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
+    it("should preserve existing end date and clear mutually exclusive filters when selecting a start date earlier than end date", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan25,
+          dateRange: { from: undefined, to: jan20 },
+          filterMonth: "1",
+          filterYear: "2026",
+        },
+        { type: "selectRangeFrom", date: jan10 }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: jan10, to: jan20 },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
+    it("should clear existing end date and mutually exclusive filters when selecting a new start date later than end date", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan10,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "3",
+          filterYear: "2026",
+        },
+        { type: "selectRangeFrom", date: jan25 }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: jan25, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
+    it("should clear existing end date when start date is deselected", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: undefined,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "all",
+          filterYear: "all",
+        },
+        { type: "selectRangeFrom", date: undefined }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
+    it("should set start date and clear mutually exclusive filters without completing range when selecting end date while start date is unset", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan10,
+          dateRange: { from: undefined, to: undefined },
+          filterMonth: "2",
+          filterYear: "2026",
+        },
+        { type: "selectRangeTo", date: jan20 }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: jan20, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
+    it("should automatically swap start and end dates and clear other temporal filters when selected end date is earlier than start date", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan25,
+          dateRange: { from: jan20, to: undefined },
+          filterMonth: "5",
+          filterYear: "2026",
+        },
+        { type: "selectRangeTo", date: jan10 }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: jan10, to: jan20 },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: true,
+      })
+    })
+
+    it("should complete range and clear other temporal filters when selected end date is on or after start date", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan25,
+          dateRange: { from: jan10, to: undefined },
+          filterMonth: "5",
+          filterYear: "2026",
+        },
+        { type: "selectRangeTo", date: jan20 }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: jan10, to: jan20 },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: true,
+      })
+    })
+
+    it("should ignore undefined end date without mutating current filter state", () => {
+      const initial = {
+        selectedDate: jan10,
+        dateRange: { from: jan10, to: undefined },
+        filterMonth: "2",
+        filterYear: "2026",
+      }
+      const next = applyTemporalFilterChange(initial, {
+        type: "selectRangeTo",
+        date: undefined,
+      })
+
+      expect(next).toEqual({
+        ...initial,
+        completed: false,
+      })
+    })
+
+    it("should clear selectedDate and dateRange when selecting a specific month while preserving filterYear", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan10,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "all",
+          filterYear: "2026",
+        },
+        { type: "selectMonth", month: "4" }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "4",
+        filterYear: "2026",
+        completed: false,
+      })
+    })
+
+    it("should preserve selectedDate and dateRange when setting month back to 'all'", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan10,
+          dateRange: { from: undefined, to: undefined },
+          filterMonth: "4",
+          filterYear: "2026",
+        },
+        { type: "selectMonth", month: "all" }
+      )
+
+      expect(next.selectedDate).toBe(jan10)
+      expect(next.filterMonth).toBe("all")
+      expect(next.filterYear).toBe("2026")
+    })
+
+    it("should clear selectedDate and dateRange when selecting a specific year while preserving filterMonth", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan10,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "4",
+          filterYear: "all",
+        },
+        { type: "selectYear", year: "2026" }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "4",
+        filterYear: "2026",
+        completed: false,
+      })
+    })
+
+    it("should reset all temporal filters on reset action", () => {
+      const next = applyTemporalFilterChange(
+        {
+          selectedDate: jan10,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "4",
+          filterYear: "2026",
+        },
+        { type: "reset" }
+      )
+
+      expect(next).toEqual({
+        selectedDate: undefined,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        completed: false,
+      })
+    })
+
+    it("should reset incompatible category key to 'all' when flow type changes", () => {
+      const next = applyTransactionFilterChange(
+        {
+          searchTerm: "bonus",
+          selectedDate: jan10,
+          filterType: "outflow",
+          filterCategoryKey: "food_beverage",
+        },
+        {
+          type: "selectType",
+          filterType: "inflow",
+          allowedCategoryKeys: ["salary_bonus", "allowance"],
+        }
+      )
+
+      expect(next.filterType).toBe("inflow")
+      expect(next.filterCategoryKey).toBe("all")
+      expect(next.searchTerm).toBe("bonus")
+      expect(next.selectedDate).toBe(jan10)
+    })
+
+    it("should preserve compatible category key when flow type changes", () => {
+      const next = applyTransactionFilterChange(
+        {
+          filterType: "inflow",
+          filterCategoryKey: "salary_bonus",
+        },
+        {
+          type: "selectType",
+          filterType: "inflow",
+          allowedCategoryKeys: ["salary_bonus", "allowance"],
+        }
+      )
+
+      expect(next.filterCategoryKey).toBe("salary_bonus")
+    })
+
+    it("should preserve category key when flow type changes to 'all'", () => {
+      const next = applyTransactionFilterChange(
+        {
+          filterType: "outflow",
+          filterCategoryKey: "food_beverage",
+        },
+        {
+          type: "selectType",
+          filterType: "all",
+        }
+      )
+
+      expect(next.filterCategoryKey).toBe("food_beverage")
+    })
+
+    it("should update category filter when selecting a category", () => {
+      const next = applyTransactionFilterChange(
+        {
+          searchTerm: "bonus",
+          filterType: "inflow",
+          filterCategoryKey: "all",
+        },
+        {
+          type: "selectCategory",
+          filterCategoryKey: "salary_bonus",
+        }
+      )
+
+      expect(next.filterCategoryKey).toBe("salary_bonus")
+    })
+
+    it("should update search term when changing search query", () => {
+      const next = applyTransactionFilterChange(
+        {
+          searchTerm: "bonus",
+          filterType: "inflow",
+          filterCategoryKey: "salary_bonus",
+        },
+        {
+          type: "changeSearch",
+          searchTerm: "monthly",
+        }
+      )
+
+      expect(next.searchTerm).toBe("monthly")
+    })
+
+    it("should reset all transaction and temporal filters on reset action", () => {
+      const next = applyTransactionFilterChange(
+        {
+          searchTerm: "monthly",
+          selectedDate: jan10,
+          dateRange: { from: jan10, to: jan20 },
+          filterMonth: "4",
+          filterYear: "2026",
+          filterType: "inflow",
+          filterCategoryKey: "salary_bonus",
+        },
+        { type: "reset" }
+      )
+
+      expect(next).toEqual({
+        searchTerm: "",
+        selectedDate: undefined,
+        dateRange: { from: undefined, to: undefined },
+        filterMonth: "all",
+        filterYear: "all",
+        filterType: "all",
+        filterCategoryKey: "all",
+        completed: false,
+      })
+    })
+
+    it("should report no active temporal filters when all fields are default", () => {
+      expect(
+        hasActiveTemporalFilters({
+          selectedDate: undefined,
+          dateRange: { from: undefined, to: undefined },
+          filterMonth: "all",
+          filterYear: "all",
+        })
+      ).toBe(false)
+    })
+
+    it("should report active temporal filters when a single date is selected", () => {
+      expect(hasActiveTemporalFilters({ selectedDate: jan10 })).toBe(true)
+    })
+
+    it("should report active temporal filters when a date range start is selected", () => {
+      expect(hasActiveTemporalFilters({ dateRange: { from: jan10 } })).toBe(
+        true
+      )
+    })
+
+    it("should report active temporal filters when a specific month is selected", () => {
+      expect(hasActiveTemporalFilters({ filterMonth: "3" })).toBe(true)
+    })
+
+    it("should report active temporal filters when a specific year is selected", () => {
+      expect(hasActiveTemporalFilters({ filterYear: "2026" })).toBe(true)
+    })
+
+    it("should report no active transaction filters when all fields are default", () => {
+      expect(hasActiveTransactionFilters({})).toBe(false)
+    })
+
+    it("should report active transaction filters when search term is non-empty", () => {
+      expect(hasActiveTransactionFilters({ searchTerm: "coffee" })).toBe(true)
+    })
+
+    it("should report active transaction filters when flow type is not 'all'", () => {
+      expect(hasActiveTransactionFilters({ filterType: "outflow" })).toBe(true)
+    })
+
+    it("should report active transaction filters when category key is not 'all'", () => {
+      expect(
+        hasActiveTransactionFilters({ filterCategoryKey: "food_beverage" })
+      ).toBe(true)
+    })
+
+    it("should build deterministic pagination reset key from active filter state", () => {
+      expect(
+        getTransactionFilterKey({
+          searchTerm: "lunch",
+          selectedDate: jan10,
+          dateRange: { from: undefined, to: undefined },
+          filterMonth: "all",
+          filterYear: "2026",
+          filterType: "outflow",
+          filterCategoryKey: "food_beverage",
+        })
+      ).toBe("lunch_2026-01-10___all_2026_outflow_food_beverage")
+    })
+  })
+
+  describe("Drill-Down URL Builder & Query Parser Round-Trip", () => {
+    const parseHrefToFilterState = (href: string): TransactionFilterState => {
+      const query = href.includes("?") ? href.slice(href.indexOf("?") + 1) : ""
+      const params = new URLSearchParams(query)
+      const dateRaw = params.get("date")
+      const fromRaw = params.get("from")
+      const toRaw = params.get("to")
+      const typeRaw = params.get("type")
+      const filterType: FlowTypeFilter =
+        typeRaw === "inflow" || typeRaw === "outflow" ? typeRaw : "all"
+      return {
+        searchTerm: params.get("search") ?? "",
+        selectedDate: dateRaw
+          ? (parseAsLocalDate.parse(dateRaw) ?? undefined)
+          : undefined,
+        dateRange: {
+          from: fromRaw
+            ? (parseAsLocalDate.parse(fromRaw) ?? undefined)
+            : undefined,
+          to: toRaw ? (parseAsLocalDate.parse(toRaw) ?? undefined) : undefined,
+        },
+        filterMonth: params.get("month") ?? "all",
+        filterYear: params.get("year") ?? "all",
+        filterType,
+        filterCategoryKey: params.get("category") ?? "all",
+      }
+    }
+
+    it("should construct canonical budget drill-down URL from UTC dates and round-trip to matching transactions", () => {
+      const href = buildTransactionsHref({
+        dateRange: {
+          from: new Date("2024-01-01T00:00:00.000Z"),
+          to: new Date("2024-02-29T00:00:00.000Z"),
+        },
+        dateMode: "utc",
+        filterType: "outflow",
+        filterCategoryKey: "food_beverage",
+      })
+
+      expect(href).toBe(
+        "/transactions?from=2024-01-01&to=2024-02-29&type=outflow&category=food_beverage"
+      )
+
+      const parsedFilters = parseHrefToFilterState(href)
+      const matching = filterTransactions(mockTransactions, parsedFilters)
+
+      expect(matching).toHaveLength(2)
+      expect(matching.map((t) => t._id)).toEqual(["2", "6"])
+    })
+
+    it("should construct canonical goal drill-down URL with open-ended end date without throwing", () => {
+      const href = buildTransactionsHref({
+        dateRange: {
+          from: new Date("2024-01-20T00:00:00.000Z"),
+          to: undefined,
+        },
+        dateMode: "utc",
+        filterType: "inflow",
+        filterCategoryKey: "business_freelance",
+      })
+
+      expect(href).toBe(
+        "/transactions?from=2024-01-20&type=inflow&category=business_freelance"
+      )
+
+      const parsedFilters = parseHrefToFilterState(href)
+      const matching = filterTransactions(mockTransactions, parsedFilters)
+
+      expect(matching).toHaveLength(1)
+      expect(matching[0]._id).toBe("3")
+    })
+
+    it("should construct statistics drill-down URL with local date range and round-trip to matching transactions", () => {
+      const hrefWithRange = buildTransactionsHref({
+        dateRange: {
+          from: new Date(2024, 0, 20),
+          to: new Date(2024, 0, 25),
+        },
+        filterType: "outflow",
+        filterCategoryKey: "transportation",
+      })
+
+      expect(hrefWithRange).toBe(
+        "/transactions?from=2024-01-20&to=2024-01-25&type=outflow&category=transportation"
+      )
+
+      const matchingRange = filterTransactions(
+        mockTransactions,
+        parseHrefToFilterState(hrefWithRange)
+      )
+      expect(matchingRange.map((t) => t._id)).toEqual(["4"])
+    })
+
+    it("should construct statistics drill-down URL with month and year filters and round-trip to matching transactions", () => {
+      const hrefWithMonthYear = buildTransactionsHref({
+        filterMonth: "1",
+        filterYear: "2024",
+        filterType: "inflow",
+        filterCategoryKey: "salary_bonus",
+      })
+
+      expect(hrefWithMonthYear).toBe(
+        "/transactions?month=1&year=2024&type=inflow&category=salary_bonus"
+      )
+
+      const matchingMonthYear = filterTransactions(
+        mockTransactions,
+        parseHrefToFilterState(hrefWithMonthYear)
+      )
+      expect(matchingMonthYear.map((t) => t._id)).toEqual(["1"])
+    })
+
+    it("should construct statistics drill-down URL with single local date and round-trip to matching transactions", () => {
+      const hrefWithSingleDate = buildTransactionsHref({
+        selectedDate: new Date(2024, 0, 20),
+        filterType: "inflow",
+        filterCategoryKey: "business_freelance",
+      })
+
+      expect(hrefWithSingleDate).toBe(
+        "/transactions?date=2024-01-20&type=inflow&category=business_freelance"
+      )
+
+      const matchingSingleDate = filterTransactions(
+        mockTransactions,
+        parseHrefToFilterState(hrefWithSingleDate)
+      )
+      expect(matchingSingleDate.map((t) => t._id)).toEqual(["3"])
+    })
+
+    it("should return bare /transactions when no active filters are provided", () => {
+      expect(
+        buildTransactionsHref({
+          filterMonth: "all",
+          filterYear: "all",
+          filterType: "all",
+          filterCategoryKey: "all",
+        })
+      ).toBe("/transactions")
+    })
+
+    it("should parse YYYY-MM-DD string into local midnight date", () => {
+      expect(parseAsLocalDate.parse("2026-08-24")).toEqual(
+        new Date(2026, 7, 24)
+      )
+    })
+
+    it("should parse ISO timestamp string into local midnight date", () => {
+      expect(parseAsLocalDate.parse("2026-08-24T15:30:00.000Z")).toEqual(
+        new Date(2026, 7, 24)
+      )
+    })
+
+    it("should return null when parsing malformed date string", () => {
+      expect(parseAsLocalDate.parse("invalid")).toBeNull()
+    })
+
+    it("should return null when parsing impossible calendar date", () => {
+      expect(parseAsLocalDate.parse("2026-02-30")).toBeNull()
+    })
+
+    it("should return null when parsing empty date string", () => {
+      expect(parseAsLocalDate.parse("")).toBeNull()
+    })
+
+    it("should serialize local date to YYYY-MM-DD string", () => {
+      const d1 = new Date(2026, 7, 24, 0, 0, 0)
+      expect(parseAsLocalDate.serialize(d1)).toBe("2026-08-24")
+    })
+
+    it("should treat two dates on the same local calendar day as equal", () => {
+      const d1 = new Date(2026, 7, 24, 0, 0, 0)
+      const d2 = new Date(2026, 7, 24, 18, 0, 0)
+      expect(parseAsLocalDate.eq(d1, d2)).toBe(true)
+    })
+
+    it("should treat two dates on different local calendar days as unequal", () => {
+      const d1 = new Date(2026, 7, 24, 0, 0, 0)
+      const d3 = new Date(2026, 7, 25, 0, 0, 0)
+      expect(parseAsLocalDate.eq(d1, d3)).toBe(false)
+    })
+  })
+
+  describe("Pure Transaction CSV Export & Formula Sanitization", () => {
+    const csvOptions = {
+      labels: {
+        headers: {
+          date: "Date",
+          type: "Type",
+          category: "Category",
+          amount: "Amount",
+          currency: "Currency",
+          originalAmount: "Original Amount",
+          originalCurrency: "Original Currency",
+          description: "Description",
+        },
+        inflow: "Inflow",
+        outflow: "Outflow",
+        from: "From",
+        to: "To",
+        filenamePrefix: "Transactions",
+      },
+      formatDate: (d: Date) => d.toISOString().slice(0, 10),
+      getCategoryLabel: (key: string) => `Label:${key}`,
+    }
+
+    it("should neutralize all formula trigger characters (=, +, -, @, tab, CR) and escape double quotes in exported CSV rows", () => {
+      const formulaCases = [
+        "=SUM(A1:A10)",
+        "+12345",
+        "-100",
+        "@SUM",
+        "\tCMD",
+        "\rCMD",
+        'Dinner "with" friends',
+      ]
+
+      const transactions = formulaCases.map((description, idx) => ({
+        ...mockTransactions[0],
+        _id: `csv-${idx}`,
+        date: new Date("2026-03-15T00:00:00.000Z"),
+        description,
+      }))
+
+      const result = buildTransactionsCSVExport(transactions, csvOptions)
+      const lines = result.csvContent.split("\n")
+
+      expect(lines[1]).toContain('"\'=SUM(A1:A10)"')
+      expect(lines[2]).toContain('"\'+12345"')
+      expect(lines[3]).toContain('"\'-100"')
+      expect(lines[4]).toContain('"\'@SUM"')
+      expect(lines[5]).toContain('"\'\tCMD"')
+      expect(lines[6]).toContain('"\'\rCMD"')
+      expect(lines[7]).toContain('"Dinner ""with"" friends"')
+    })
+
+    it("should build CSV content and single-date filename when exporting 1 transaction", () => {
+      const single = [
+        {
+          ...mockTransactions[0],
+          date: new Date("2026-03-15T00:00:00.000Z"),
+          description: '=HYPERLINK("http://evil.com")',
+          originalAmount: "40",
+          originalCurrency: "USD" as const,
+        },
+      ]
+
+      const result = buildTransactionsCSVExport(single, csvOptions)
+
+      expect(result.filename).toBe("transactions_2026-03-15.csv")
+      const lines = result.csvContent.split("\n")
+      expect(lines).toHaveLength(2)
+      expect(lines[0]).toBe(
+        '"Date","Type","Category","Amount","Currency","Original Amount","Original Currency","Description"'
+      )
+      expect(lines[1]).toBe(
+        '"2026-03-15","Inflow","Label:salary_bonus","1000","VND","40","USD","\'=HYPERLINK(""http://evil.com"")"'
+      )
+    })
+
+    it("should build CSV content with fallback originalAmount/originalCurrency and min-max date span filename for multiple transactions", () => {
+      const multiple = [
+        {
+          ...mockTransactions[1],
+          date: new Date("2026-05-20T00:00:00.000Z"),
+          originalAmount: undefined,
+          originalCurrency: undefined,
+        },
+        {
+          ...mockTransactions[0],
+          date: new Date("2026-01-05T00:00:00.000Z"),
+          originalAmount: undefined,
+          originalCurrency: undefined,
+        },
+      ]
+
+      const result = buildTransactionsCSVExport(multiple, {
+        ...csvOptions,
+        formatDate: (d: Date | string) => {
+          const date = typeof d === "string" ? new Date(d) : d
+          // Include slashes and spaces to verify filename sanitization
+          return `Mon, ${date.toISOString().slice(0, 10).replace(/-/g, "/")}`
+        },
+      })
+
+      expect(result.filename).toBe(
+        "transactions_from_mon,_2026_01_05_to_mon,_2026_05_20.csv"
+      )
+      const lines = result.csvContent.split("\n")
+      expect(lines).toHaveLength(3)
+      expect(lines[1]).toBe(
+        '"Mon, 2026/05/20","Outflow","Label:food_beverage","200","VND","200","VND","Groceries"'
+      )
+      expect(lines[2]).toBe(
+        '"Mon, 2026/01/05","Inflow","Label:salary_bonus","1000","VND","1000","VND","Salary"'
+      )
     })
   })
 })

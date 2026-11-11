@@ -36,8 +36,14 @@ import { useCategory } from "@/hooks/use-category"
 import { useFormatDate } from "@/hooks/use-format-date"
 import { useMonths } from "@/hooks/use-months"
 import { getUniqueYears } from "@/lib/date"
-import { filterTransactions } from "@/lib/filters"
-import { parseAsLocalDate } from "@/lib/parser"
+import {
+  applyTransactionFilterChange,
+  filterTransactions,
+  getTransactionFilterKey,
+  hasActiveTransactionFilters,
+  parseAsLocalDate,
+} from "@/lib/filters"
+import type { FlowTypeFilter, TransactionFilterAction } from "@/lib/filters"
 
 export function TransactionFilters() {
   const { transactions } = useTransactions()
@@ -69,13 +75,6 @@ export function TransactionFilters() {
     }),
     [dateRangeFromIso, dateRangeToIso]
   )
-  const setDateRange = (range: {
-    from: Date | undefined
-    to: Date | undefined
-  }) => {
-    setDateRangeFromIso(range.from || null)
-    setDateRangeToIso(range.to || null)
-  }
 
   const [filterMonth, setFilterMonth] = useQueryState(
     "month",
@@ -89,7 +88,7 @@ export function TransactionFilters() {
     "type",
     parseAsString.withDefault("all")
   )
-  const filterType = filterTypeRaw as "all" | "inflow" | "outflow"
+  const filterType = filterTypeRaw as FlowTypeFilter
   const [filterCategoryKey, setFilterCategoryKey] = useQueryState(
     "category",
     parseAsString.withDefault("all")
@@ -100,77 +99,7 @@ export function TransactionFilters() {
   const allMonths = useMonths()
   const allYears = getUniqueYears(transactions)
 
-  const hasActiveFilters =
-    searchTerm !== "" ||
-    selectedDate ||
-    dateRange.from ||
-    dateRange.to ||
-    filterMonth !== "all" ||
-    filterYear !== "all" ||
-    filterType !== "all" ||
-    filterCategoryKey !== "all"
-
-  const handleResetFilters = () => {
-    setSearchTerm(null)
-    setSelectedDateIso(null)
-    setDateRangeFromIso(null)
-    setDateRangeToIso(null)
-    setFilterMonth(null)
-    setFilterYear(null)
-    setFilterType(null)
-    setFilterCategoryKey(null)
-  }
-
-  const handleDateChange = (date: Date | undefined) => {
-    setSelectedDateIso(date || null)
-    setDateRangeFromIso(null)
-    setDateRangeToIso(null)
-    setFilterMonth(null)
-    setFilterYear(null)
-    setIsDatePickerOpen(false)
-  }
-
-  const handleDateRangeChange = (range: {
-    from: Date | undefined
-    to: Date | undefined
-  }) => {
-    setDateRangeFromIso(range.from || null)
-    setDateRangeToIso(range.to || null)
-    setSelectedDateIso(null)
-    setFilterMonth(null)
-    setFilterYear(null)
-    setIsDateRangeOpen(false)
-  }
-
-  const handleMonthChange = (month: string) => {
-    setFilterMonth(month)
-    if (month !== "all") {
-      setSelectedDateIso(null)
-      setDateRangeFromIso(null)
-      setDateRangeToIso(null)
-    }
-  }
-
-  const handleYearChange = (year: string) => {
-    setFilterYear(year)
-    if (year !== "all") {
-      setSelectedDateIso(null)
-      setDateRangeFromIso(null)
-      setDateRangeToIso(null)
-    }
-  }
-
-  const handleTypeChange = (type: "all" | "inflow" | "outflow") => {
-    setFilterType(type)
-    if (type !== "all" && filterCategoryKey !== "all") {
-      const allowedCategories = getCategoriesByType(type)
-      if (!allowedCategories.some((c) => c.key === filterCategoryKey)) {
-        setFilterCategoryKey("all")
-      }
-    }
-  }
-
-  const filteredTransactions = filterTransactions(transactions, {
+  const filterState = {
     searchTerm,
     selectedDate,
     dateRange,
@@ -178,7 +107,28 @@ export function TransactionFilters() {
     filterYear,
     filterType,
     filterCategoryKey,
-  })
+  }
+
+  const hasActiveFilters = hasActiveTransactionFilters(filterState)
+
+  const dispatchFilterAction = (action: TransactionFilterAction) => {
+    const next = applyTransactionFilterChange(filterState, action)
+    setSearchTerm(next.searchTerm === "" ? null : next.searchTerm)
+    setSelectedDateIso(next.selectedDate || null)
+    setDateRangeFromIso(next.dateRange.from || null)
+    setDateRangeToIso(next.dateRange.to || null)
+    setFilterMonth(next.filterMonth === "all" ? null : next.filterMonth)
+    setFilterYear(next.filterYear === "all" ? null : next.filterYear)
+    setFilterType(next.filterType === "all" ? null : next.filterType)
+    setFilterCategoryKey(
+      next.filterCategoryKey === "all" ? null : next.filterCategoryKey
+    )
+    if (next.completed) {
+      setIsDateRangeOpen(false)
+    }
+  }
+
+  const filteredTransactions = filterTransactions(transactions, filterState)
 
   return (
     <>
@@ -203,13 +153,23 @@ export function TransactionFilters() {
               <InputGroupInput
                 placeholder={t("Search transactions...")}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) =>
+                  dispatchFilterAction({
+                    type: "changeSearch",
+                    searchTerm: e.target.value,
+                  })
+                }
               />
               {searchTerm && (
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
                     size="icon-xs"
-                    onClick={() => setSearchTerm("")}
+                    onClick={() =>
+                      dispatchFilterAction({
+                        type: "changeSearch",
+                        searchTerm: "",
+                      })
+                    }
                   >
                     <XIcon />
                   </InputGroupButton>
@@ -236,7 +196,10 @@ export function TransactionFilters() {
                   mode="single"
                   selected={selectedDate}
                   captionLayout="dropdown"
-                  onSelect={(date) => handleDateChange(date)}
+                  onSelect={(date) => {
+                    dispatchFilterAction({ type: "selectDate", date })
+                    setIsDatePickerOpen(false)
+                  }}
                 />
               </PopoverContent>
             </Popover>
@@ -275,15 +238,12 @@ export function TransactionFilters() {
                       selected={dateRange.from}
                       defaultMonth={dateRange.from}
                       captionLayout="dropdown"
-                      onSelect={(date) => {
-                        setDateRange({
-                          from: date,
-                          to:
-                            dateRange.to && date && date > dateRange.to
-                              ? undefined
-                              : dateRange.to,
+                      onSelect={(date) =>
+                        dispatchFilterAction({
+                          type: "selectRangeFrom",
+                          date,
                         })
-                      }}
+                      }
                     />
                   </div>
                   <div>
@@ -294,34 +254,24 @@ export function TransactionFilters() {
                       selected={dateRange.to}
                       defaultMonth={dateRange.to}
                       captionLayout="dropdown"
-                      onSelect={(date) => {
-                        if (!date) return
-                        if (!dateRange.from) {
-                          setDateRange({
-                            from: date,
-                            to: undefined,
-                          })
-                          return
-                        }
-                        if (date < dateRange.from) {
-                          handleDateRangeChange({
-                            from: date,
-                            to: dateRange.from,
-                          })
-                          return
-                        }
-                        handleDateRangeChange({
-                          from: dateRange.from,
-                          to: date,
+                      onSelect={(date) =>
+                        dispatchFilterAction({
+                          type: "selectRangeTo",
+                          date,
                         })
-                      }}
+                      }
                     />
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
 
-            <Select value={filterMonth} onValueChange={handleMonthChange}>
+            <Select
+              value={filterMonth}
+              onValueChange={(month) =>
+                dispatchFilterAction({ type: "selectMonth", month })
+              }
+            >
               <SelectTrigger
                 className={cn(
                   "w-full md:row-start-3 lg:row-start-2",
@@ -343,7 +293,12 @@ export function TransactionFilters() {
               </SelectContent>
             </Select>
 
-            <Select value={filterYear} onValueChange={handleYearChange}>
+            <Select
+              value={filterYear}
+              onValueChange={(year) =>
+                dispatchFilterAction({ type: "selectYear", year })
+              }
+            >
               <SelectTrigger
                 className={cn(
                   "w-full md:row-start-3 2xl:row-start-2",
@@ -365,7 +320,19 @@ export function TransactionFilters() {
               </SelectContent>
             </Select>
 
-            <Select value={filterType} onValueChange={handleTypeChange}>
+            <Select
+              value={filterType}
+              onValueChange={(nextType: FlowTypeFilter) =>
+                dispatchFilterAction({
+                  type: "selectType",
+                  filterType: nextType,
+                  allowedCategoryKeys:
+                    nextType === "all"
+                      ? undefined
+                      : getCategoriesByType(nextType).map((c) => c.key),
+                })
+              }
+            >
               <SelectTrigger
                 className={cn(
                   "w-full md:row-start-4 lg:row-start-3 2xl:row-start-2",
@@ -386,7 +353,12 @@ export function TransactionFilters() {
 
             <Select
               value={filterCategoryKey}
-              onValueChange={setFilterCategoryKey}
+              onValueChange={(categoryKey) =>
+                dispatchFilterAction({
+                  type: "selectCategory",
+                  filterCategoryKey: categoryKey,
+                })
+              }
             >
               <SelectTrigger
                 className={cn(
@@ -442,7 +414,7 @@ export function TransactionFilters() {
             {hasActiveFilters && (
               <Button
                 variant="outline"
-                onClick={handleResetFilters}
+                onClick={() => dispatchFilterAction({ type: "reset" })}
                 className="col-span-full 2xl:col-auto 2xl:row-start-2"
               >
                 {t("Reset")}
@@ -454,7 +426,7 @@ export function TransactionFilters() {
 
       <TransactionsTable
         filteredTransactions={filteredTransactions}
-        filterKey={`${searchTerm ?? ""}_${selectedDateIso ?? ""}_${dateRangeFromIso ?? ""}_${dateRangeToIso ?? ""}_${filterMonth}_${filterYear}_${filterType}_${filterCategoryKey}`}
+        filterKey={getTransactionFilterKey(filterState)}
       />
     </>
   )

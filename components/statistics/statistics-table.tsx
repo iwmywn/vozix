@@ -31,19 +31,15 @@ import {
 import { useTransactions } from "@/contexts/transactions-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
-import { serializeLocalDate } from "@/lib/date"
+import { buildTransactionsHref } from "@/lib/filters"
+import type { TemporalFilterState } from "@/lib/filters"
 import { getFlowColorClass } from "@/lib/utils"
 import type { CategoryRollupValuation } from "@/lib/valuation-engine"
 
 interface StatisticsTableProps {
   valuations: CategoryRollupValuation[]
   hasUnconverted?: boolean
-  filterStates?: {
-    selectedDate?: Date
-    dateRange?: { from?: Date; to?: Date }
-    filterMonth?: string
-    filterYear?: string
-  }
+  filterStates?: TemporalFilterState
 }
 
 export function StatisticsTable({
@@ -56,28 +52,12 @@ export function StatisticsTable({
   const { getCategoryLabel, getCategoryDescription } = useCategory()
   const formatCurrency = useFormatCurrency()
 
-  const getTransactionsHref = (valuation: CategoryRollupValuation): Route => {
-    const params = new URLSearchParams()
-    if (filterStates?.selectedDate) {
-      params.set("date", serializeLocalDate(filterStates.selectedDate))
-    }
-    if (filterStates?.dateRange?.from) {
-      params.set("from", serializeLocalDate(filterStates.dateRange.from))
-    }
-    if (filterStates?.dateRange?.to) {
-      params.set("to", serializeLocalDate(filterStates.dateRange.to))
-    }
-    if (filterStates?.filterMonth && filterStates.filterMonth !== "all") {
-      params.set("month", filterStates.filterMonth)
-    }
-    if (filterStates?.filterYear && filterStates.filterYear !== "all") {
-      params.set("year", filterStates.filterYear)
-    }
-    params.set("type", valuation.type)
-    params.set("category", valuation.categoryKey)
-
-    return `/transactions?${params.toString()}`
-  }
+  const getTransactionsHref = (valuation: CategoryRollupValuation): Route =>
+    buildTransactionsHref({
+      ...filterStates,
+      filterType: valuation.type,
+      filterCategoryKey: valuation.categoryKey,
+    })
 
   return (
     <Card>
