@@ -96,46 +96,97 @@ function isValidRate(rate: unknown): rate is number {
 export const defaultExchangeRateProvider: ExchangeRateProvider =
   new CurrencyApiAdapter()
 
+export type EnsureExchangeRateOptions = {
+  provider?: ExchangeRateProvider
+  throwOnError?: boolean
+  enqueueOnFailure?: boolean
+}
+
+export type EnsureExchangeRateResult = {
+  success: boolean
+  error?: string
+}
+
 export async function ensureExchangeRateForDate(
   date: Date,
-  provider: ExchangeRateProvider = defaultExchangeRateProvider
-): Promise<void> {
+  providerOrOptions?: ExchangeRateProvider | EnsureExchangeRateOptions
+): Promise<EnsureExchangeRateResult> {
+  const isProvider =
+    providerOrOptions !== null &&
+    typeof providerOrOptions === "object" &&
+    "fetchRates" in providerOrOptions &&
+    typeof (providerOrOptions as ExchangeRateProvider).fetchRates === "function"
+
+  const provider: ExchangeRateProvider = isProvider
+    ? (providerOrOptions as ExchangeRateProvider)
+    : ((providerOrOptions as EnsureExchangeRateOptions | undefined)?.provider ??
+      defaultExchangeRateProvider)
+
+  const options: EnsureExchangeRateOptions | undefined = isProvider
+    ? undefined
+    : (providerOrOptions as EnsureExchangeRateOptions | undefined)
+
+  const throwOnError = Boolean(options?.throwOnError)
+  const enqueueOnFailure = options?.enqueueOnFailure ?? true
+
   const normalizedDate = normalizeToUTCMidnight(date)
-  const collection = await getExchangeRatesCollection()
-  const existing = await collection.findOne({ date: normalizedDate })
 
-  const nonUSDCurrencies = CURRENCIES.filter((c) => c !== "USD")
-  const missingCurrencies = nonUSDCurrencies.filter(
-    (curr) => !existing?.rates || existing.rates[curr] === undefined
-  )
+  try {
+    const collection = await getExchangeRatesCollection()
+    const existing = await collection.findOne({ date: normalizedDate })
 
-  if (missingCurrencies.length === 0) return
-
-  const dateStr = normalizedDate.toISOString().split("T")[0]
-  const fetchedRates = await provider.fetchRates(dateStr)
-
-  const missingFromFetched = missingCurrencies.filter(
-    (curr) => !isValidRate(fetchedRates[curr])
-  )
-  if (missingFromFetched.length > 0) {
-    throw new Error(
-      `Exchange rate provider missing currencies [${missingFromFetched.join(", ")}] for date ${dateStr}`
+    const nonUSDCurrencies = CURRENCIES.filter((c) => c !== "USD")
+    const missingCurrencies = nonUSDCurrencies.filter(
+      (curr) => !existing?.rates || existing.rates[curr] === undefined
     )
-  }
 
-  const updateFields: Record<string, Decimal128> = {}
-  for (const [curr, rateVal] of Object.entries(fetchedRates)) {
-    if (curr === "USD") continue
-    if (!isValidRate(rateVal)) continue
-    updateFields[`rates.${curr}`] = Decimal128.fromString(rateVal.toString())
-  }
+    if (missingCurrencies.length === 0) return { success: true }
 
-  if (Object.keys(updateFields).length > 0) {
-    await collection.updateOne(
-      { date: normalizedDate },
-      { $set: updateFields },
-      { upsert: true }
+    const dateStr = normalizedDate.toISOString().split("T")[0]
+    const fetchedRates = await provider.fetchRates(dateStr)
+
+    const missingFromFetched = missingCurrencies.filter(
+      (curr) => !isValidRate(fetchedRates[curr])
     )
+    if (missingFromFetched.length > 0) {
+      throw new Error(
+        `Exchange rate provider missing currencies [${missingFromFetched.join(", ")}] for date ${dateStr}`
+      )
+    }
+
+    const updateFields: Record<string, Decimal128> = {}
+    for (const [curr, rateVal] of Object.entries(fetchedRates)) {
+      if (curr === "USD") continue
+      if (!isValidRate(rateVal)) continue
+      updateFields[`rates.${curr}`] = Decimal128.fromString(rateVal.toString())
+    }
+
+    if (Object.keys(updateFields).length > 0) {
+      await collection.updateOne(
+        { date: normalizedDate },
+        { $set: updateFields },
+        { upsert: true }
+      )
+    }
+
+    return { success: true }
+  } catch (error) {
+    if (enqueueOnFailure) {
+      console.warn(
+        "Could not ensure exchange rate for transaction date, enqueuing retry:",
+        error
+      )
+      await enqueueMissingExchangeRateDate(normalizedDate, error)
+    }
+
+    if (throwOnError) {
+      throw error
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error ?? ""),
+    }
   }
 }
 
@@ -498,7 +549,11 @@ export async function reconcileMissingRatesQueue(
   const syncResults = await Promise.allSettled(
     missingDates.map(async (d): Promise<SyncItemResult> => {
       try {
-        await currencyEngine.ensureExchangeRateForDate(d, provider)
+        await currencyEngine.ensureExchangeRateForDate(d, {
+          provider,
+          throwOnError: true,
+          enqueueOnFailure: false,
+        })
         await missingRatesCollection.deleteOne({ date: d })
         return { success: true, date: d }
       } catch (error) {

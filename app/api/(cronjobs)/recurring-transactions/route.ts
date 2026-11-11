@@ -1,9 +1,6 @@
 import type { NextRequest } from "next/server"
 
-import {
-  enqueueMissingExchangeRateDate,
-  ensureExchangeRateForDate,
-} from "@/actions/exchange-rates.actions"
+import { ensureExchangeRateForDate } from "@/actions/exchange-rates.actions"
 import { verifyCronAuth } from "@/lib/cron"
 import { processDueRecurringTransactions } from "@/lib/recurring-engine"
 
@@ -19,15 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const summary = await processDueRecurringTransactions({
       onOccurrencesCreated: async (dates) => {
-        await Promise.allSettled(
-          dates.map(async (d) => {
-            try {
-              await ensureExchangeRateForDate(d)
-            } catch (error) {
-              await enqueueMissingExchangeRateDate(d, error)
-            }
-          })
-        )
+        await Promise.allSettled(dates.map((d) => ensureExchangeRateForDate(d)))
       },
     })
 
