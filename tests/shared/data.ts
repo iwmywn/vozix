@@ -1,6 +1,5 @@
-import { ObjectId } from "mongodb"
+import { Decimal128, ObjectId } from "mongodb"
 
-import { toDecimal128 } from "@/actions/utils"
 import type { CategoryType } from "@/lib/category"
 import type { Currency } from "@/lib/currency"
 import { localDateToUTCMidnight, normalizeToUTCMidnight } from "@/lib/date"
@@ -18,6 +17,8 @@ import type {
   Transaction,
   User,
 } from "@/lib/definitions"
+
+const toDecimal128 = (value: string): Decimal128 => Decimal128.fromString(value)
 
 export const mockDBUser: DBUser = {
   _id: new ObjectId("68f712e4cda4897217a05a1c"),

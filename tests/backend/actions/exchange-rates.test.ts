@@ -1,15 +1,15 @@
 import { insertTestExchangeRates } from "@/tests/backend/helpers/database"
 import { mockDBExchangeRates, mockTransactions } from "@/tests/shared/data"
 import {
-  convertTransactionsToCurrency,
-  ensureExchangeRateForDate,
-} from "@/actions/exchange-rates.actions"
-import { toDecimal128 } from "@/actions/utils"
-import {
   getExchangeRatesCollection,
   getMissingExchangeRatesCollection,
 } from "@/lib/collections"
+import {
+  convertTransactionsToCurrency,
+  ensureExchangeRateForDate,
+} from "@/lib/currency-engine"
 import { normalizeToUTCMidnight } from "@/lib/date"
+import { toDecimal128 } from "@/lib/db"
 import type { Transaction } from "@/lib/definitions"
 
 describe("convertTransactionsToCurrency", () => {

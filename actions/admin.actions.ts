@@ -14,14 +14,13 @@ import {
   getTransactionsCollection,
   getUsersCollection,
 } from "@/lib/collections"
-import { connect, withTransaction } from "@/lib/db"
+import { connect, getActiveBanMongoFilter, withTransaction } from "@/lib/db"
 import type { ActionResponse, User } from "@/lib/definitions"
 import { isRateLimited, RATE_LIMIT_PRESETS } from "@/lib/rate-limit"
 import { ADMIN_ROLE } from "@/lib/role"
 import { isUserBanned } from "@/lib/utils"
 
 import { getSession } from "./session.actions"
-import { getActiveBanMongoFilter } from "./utils"
 
 export type AdminStats = {
   totalUsers: number

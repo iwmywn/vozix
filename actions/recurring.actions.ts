@@ -6,13 +6,13 @@ import { getExtracted } from "next-intl/server"
 
 import { runDomainMutation } from "@/lib/action-handler"
 import { getRecurringTransactionsCollection } from "@/lib/collections"
+import { toDecimal128 } from "@/lib/db"
 import type { ActionResponse, RecurringTransaction } from "@/lib/definitions"
 import { RATE_LIMIT_PRESETS } from "@/lib/rate-limit"
 import { getSchemas } from "@/schemas/server"
 import type { RecurringTransactionFormValues } from "@/schemas/types"
 
 import { getSession } from "./session.actions"
-import { toDecimal128 } from "./utils"
 
 export async function createRecurringTransaction(
   values: RecurringTransactionFormValues

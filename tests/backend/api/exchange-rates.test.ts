@@ -7,7 +7,6 @@ import {
   insertTestTransaction,
 } from "@/tests/backend/helpers/database"
 import { mockDBAnotherUser, mockDBUser } from "@/tests/shared/data"
-import { toDecimal128 } from "@/actions/utils"
 import { GET } from "@/app/api/(cronjobs)/exchange-rates/route"
 import * as collections from "@/lib/collections"
 import {
@@ -16,6 +15,7 @@ import {
 } from "@/lib/collections"
 import * as exchangeRatesActions from "@/lib/currency-engine"
 import { addDays, normalizeToUTCMidnight } from "@/lib/date"
+import { toDecimal128 } from "@/lib/db"
 
 const cronSecret = "test-cron-secret"
 const cronEndpoint = "http://localhost/api/exchange-rates"
@@ -191,7 +191,7 @@ describe("Exchange Rates Cron Job", () => {
     it("should not increment retryCount when enqueueMissingExchangeRateDate is called multiple times for the same date", async () => {
       const testDate = new Date("2024-05-20T00:00:00Z")
       const { enqueueMissingExchangeRateDate } =
-        await import("@/actions/exchange-rates.actions")
+        await import("@/lib/currency-engine")
 
       // Simulate 6 transactions being added on the same date with missing rate
       for (let i = 0; i < 6; i++) {
