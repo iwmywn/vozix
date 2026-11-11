@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 
-import { ensureExchangeRateForDate } from "@/actions/exchange-rates.actions"
 import { verifyCronAuth } from "@/lib/cron"
+import { ensureExchangeRateForDate } from "@/lib/currency-engine"
 import { processDueRecurringTransactions } from "@/lib/recurring-engine"
 
 // Vercel Cron Jobs only trigger HTTP GET requests.

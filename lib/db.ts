@@ -1,6 +1,6 @@
 import "server-only"
 
-import { MongoClient } from "mongodb"
+import { Decimal128, MongoClient } from "mongodb"
 import type {
   ClientSession,
   Collection,
@@ -79,5 +79,20 @@ export async function withTransaction<T>(
     return await session.withTransaction(() => callback(session))
   } finally {
     await session.endSession()
+  }
+}
+
+export function toDecimal128(value: string): Decimal128 {
+  return Decimal128.fromString(value)
+}
+
+export function getActiveBanMongoFilter(now: Date = new Date()) {
+  return {
+    banned: true,
+    $or: [
+      { banExpires: null },
+      { banExpires: { $exists: false } },
+      { banExpires: { $gt: now } },
+    ],
   }
 }

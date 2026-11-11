@@ -7,13 +7,13 @@ import { z } from "zod"
 
 import { runDomainMutation } from "@/lib/action-handler"
 import { getGoalsCollection } from "@/lib/collections"
+import { toDecimal128 } from "@/lib/db"
 import type { ActionResponse, Goal } from "@/lib/definitions"
 import { RATE_LIMIT_PRESETS } from "@/lib/rate-limit"
 import { getSchemas } from "@/schemas/server"
 import type { GoalFormValues } from "@/schemas/types"
 
 import { getSession } from "./session.actions"
-import { toDecimal128 } from "./utils"
 
 export async function createGoal(
   values: GoalFormValues

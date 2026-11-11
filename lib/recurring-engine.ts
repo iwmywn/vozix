@@ -2,14 +2,13 @@ import "server-only"
 
 import { revalidateTag } from "next/cache"
 
-import { getActiveBanMongoFilter } from "@/actions/utils"
 import {
   getRecurringTransactionsCollection,
   getTransactionsCollection,
   getUsersCollection,
 } from "@/lib/collections"
 import { normalizeToUTCMidnight } from "@/lib/date"
-import { withTransaction } from "@/lib/db"
+import { getActiveBanMongoFilter, withTransaction } from "@/lib/db"
 import type { DBRecurringTransaction } from "@/lib/definitions"
 import { isDuplicateKeyError } from "@/lib/indexes"
 import { getDueOccurrences, resolveScheduleBoundaries } from "@/lib/recurring"
