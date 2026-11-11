@@ -89,16 +89,33 @@ describe("CurrencyEngine", () => {
       expect(savedDoc?.rates?.JPY?.toString()).toBe("155")
     })
 
-    it("should throw when InMemoryAdapter lacks rates for date", async () => {
+    it("should automatically enqueue missing rate date and return failure result when InMemoryAdapter lacks rates", async () => {
       const adapter = new InMemoryExchangeRateAdapter()
       const date = new Date("2026-09-01T00:00:00Z")
 
-      await expect(ensureExchangeRateForDate(date, adapter)).rejects.toThrow(
-        /No rates configured/
-      )
+      const result = await ensureExchangeRateForDate(date, adapter)
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/No rates configured/)
+
+      const missingCollection = await getMissingExchangeRatesCollection()
+      const missingDoc = await missingCollection.findOne({ date })
+      expect(missingDoc).toBeDefined()
+      expect(missingDoc?.lastError).toMatch(/No rates configured/)
     })
 
-    it("should throw when fetched rates are missing required currencies", async () => {
+    it("should throw when strict throwOnError option is specified", async () => {
+      const adapter = new InMemoryExchangeRateAdapter()
+      const date = new Date("2026-09-02T00:00:00Z")
+
+      await expect(
+        ensureExchangeRateForDate(date, {
+          provider: adapter,
+          throwOnError: true,
+        })
+      ).rejects.toThrow(/No rates configured/)
+    })
+
+    it("should automatically enqueue when fetched rates are missing required currencies", async () => {
       const partialAdapter = new InMemoryExchangeRateAdapter({
         "2026-06-01": {
           USD: 1,
@@ -108,12 +125,17 @@ describe("CurrencyEngine", () => {
       })
 
       const date = new Date("2026-06-01T00:00:00Z")
-      await expect(
-        ensureExchangeRateForDate(date, partialAdapter)
-      ).rejects.toThrow(/missing currencies/i)
+      const result = await ensureExchangeRateForDate(date, partialAdapter)
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/missing currencies/i)
+
+      const missingCollection = await getMissingExchangeRatesCollection()
+      const missingDoc = await missingCollection.findOne({ date })
+      expect(missingDoc).toBeDefined()
+      expect(missingDoc?.lastError).toMatch(/missing currencies/i)
     })
 
-    it("should throw when fetched rates have invalid non-positive or non-finite rate values", async () => {
+    it("should automatically enqueue when fetched rates have invalid non-positive or non-finite rate values", async () => {
       const invalidAdapter = new InMemoryExchangeRateAdapter({
         "2026-06-02": {
           USD: 1,
@@ -125,9 +147,14 @@ describe("CurrencyEngine", () => {
       })
 
       const date = new Date("2026-06-02T00:00:00Z")
-      await expect(
-        ensureExchangeRateForDate(date, invalidAdapter)
-      ).rejects.toThrow(/missing currencies/i)
+      const result = await ensureExchangeRateForDate(date, invalidAdapter)
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/missing currencies/i)
+
+      const missingCollection = await getMissingExchangeRatesCollection()
+      const missingDoc = await missingCollection.findOne({ date })
+      expect(missingDoc).toBeDefined()
+      expect(missingDoc?.lastError).toMatch(/missing currencies/i)
     })
   })
 

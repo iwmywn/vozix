@@ -5,7 +5,10 @@ import {
   ensureExchangeRateForDate,
 } from "@/actions/exchange-rates.actions"
 import { toDecimal128 } from "@/actions/utils"
-import { getExchangeRatesCollection } from "@/lib/collections"
+import {
+  getExchangeRatesCollection,
+  getMissingExchangeRatesCollection,
+} from "@/lib/collections"
 import { normalizeToUTCMidnight } from "@/lib/date"
 import type { Transaction } from "@/lib/definitions"
 
@@ -460,7 +463,7 @@ describe("ensureExchangeRateForDate", () => {
     expect(updated?.rates.CNY?.toString()).toBe("7.18")
   })
 
-  it("should throw error when Currency API returns non-ok status", async () => {
+  it("should throw error when Currency API returns non-ok status and throwOnError is true", async () => {
     const testDate = new Date("2024-05-10T00:00:00Z")
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
@@ -468,9 +471,44 @@ describe("ensureExchangeRateForDate", () => {
       status: 500,
     } as Response)
 
-    await expect(ensureExchangeRateForDate(testDate)).rejects.toThrow(
-      "Currency API returned status 500"
+    await expect(
+      ensureExchangeRateForDate(testDate, { throwOnError: true })
+    ).rejects.toThrow("Currency API returned status 500")
+  })
+
+  it("should automatically enqueue missing rate date when Currency API returns non-ok status by default", async () => {
+    const testDate = new Date("2024-05-11T00:00:00Z")
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    } as Response)
+
+    const result = await ensureExchangeRateForDate(testDate)
+    expect(result.success).toBe(false)
+    expect(result.error).toContain("Currency API returned status 500")
+
+    const missingRatesCollection = await getMissingExchangeRatesCollection()
+    const doc = await missingRatesCollection.findOne({ date: testDate })
+    expect(doc).toBeDefined()
+    expect(doc?.lastError).toContain("Currency API returned status 500")
+  })
+
+  it("should automatically enqueue missing rate date when network request times out or rejects", async () => {
+    const testDate = new Date("2024-05-12T00:00:00Z")
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
+      new Error("Network timeout: connection timed out after 5000ms")
     )
+
+    const result = await ensureExchangeRateForDate(testDate)
+    expect(result.success).toBe(false)
+    expect(result.error).toContain("Network timeout")
+
+    const missingRatesCollection = await getMissingExchangeRatesCollection()
+    const doc = await missingRatesCollection.findOne({ date: testDate })
+    expect(doc).toBeDefined()
+    expect(doc?.lastError).toContain("Network timeout")
   })
 
   it("should handle exchange rate documents with null or undefined rates defensively", async () => {

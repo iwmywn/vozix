@@ -82,6 +82,45 @@ describe("Recurring Transactions Cron Route Adapter", () => {
       }
     })
 
+    it("should safely complete and return 200 even when exchange rate provider fails during occurrence processing", async () => {
+      const lastMonthUTC = localDateToUTCMidnight(new Date("2024-01-01"))
+
+      const recurringTransaction: DBRecurringTransaction = {
+        ...mockDBRecurringTransaction,
+        frequency: "monthly",
+        startDate: lastMonthUTC,
+        lastGeneratedDate: lastMonthUTC,
+      }
+      await insertTestRecurringTransaction(recurringTransaction)
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      } as Response)
+
+      vi.useFakeTimers()
+      try {
+        vi.setSystemTime(new Date("2024-02-01T12:00:00.000Z"))
+
+        const request = new NextRequest(cronEndpoint, {
+          headers: {
+            authorization: `Bearer ${cronSecret}`,
+          },
+        })
+
+        const response = await GET(request)
+        const data = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(data.success).toBe(true)
+        expect(data.created).toBe(1)
+        expect(data.createdIds).toHaveLength(1)
+      } finally {
+        vi.useRealTimers()
+        fetchSpy.mockRestore()
+      }
+    })
+
     it("should return non-2xx status, log errors, and report success=false when summary.errors is nonempty", async () => {
       const consoleErrorSpy = vi
         .spyOn(console, "error")

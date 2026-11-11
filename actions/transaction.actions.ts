@@ -16,7 +16,6 @@ import type { TransactionFormValues } from "@/schemas/types"
 
 import {
   convertTransactionsToCurrency,
-  enqueueMissingExchangeRateDate,
   ensureExchangeRateForDate,
 } from "./exchange-rates.actions"
 import { getSession } from "./session.actions"
@@ -38,15 +37,7 @@ export async function createTransaction(
     revalidate: ["transactions"],
     onSuccessAfter: ({ input }) => {
       after(async () => {
-        try {
-          await ensureExchangeRateForDate(input.date)
-        } catch (error) {
-          console.warn(
-            "Could not ensure exchange rate for transaction date, enqueuing retry:",
-            error
-          )
-          await enqueueMissingExchangeRateDate(input.date, error)
-        }
+        await ensureExchangeRateForDate(input.date)
       })
     },
     successMessage: t("Transaction has been created."),
@@ -99,15 +90,7 @@ export async function updateTransaction(
     revalidate: ["transactions"],
     onSuccessAfter: ({ input }) => {
       after(async () => {
-        try {
-          await ensureExchangeRateForDate(input.values.date)
-        } catch (error) {
-          console.warn(
-            "Could not ensure exchange rate for transaction date, enqueuing retry:",
-            error
-          )
-          await enqueueMissingExchangeRateDate(input.values.date, error)
-        }
+        await ensureExchangeRateForDate(input.values.date)
       })
     },
     successMessage: t("Transaction has been updated."),
