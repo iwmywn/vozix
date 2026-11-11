@@ -7,11 +7,8 @@ import { getGoals } from "@/actions/goal.actions"
 import { getRecurringTransactions } from "@/actions/recurring.actions"
 import { getTransactions } from "@/actions/transaction.actions"
 import { EmptyState } from "@/components/empty-state"
-import { BudgetsContext } from "@/contexts/budgets-context"
-import { CategoriesContext } from "@/contexts/categories-context"
-import { GoalsContext } from "@/contexts/goals-context"
-import { RecurringContext } from "@/contexts/recurring-context"
-import { TransactionsContext } from "@/contexts/transactions-context"
+import { PageDataContext } from "@/contexts/page-data-context"
+import type { PageData } from "@/contexts/page-data-context"
 
 type PageDataProviderProps = {
   children: React.ReactNode
@@ -104,55 +101,13 @@ export async function PageDataProvider({
     )
   }
 
-  let content = children
-
-  if (transactions && transactionsResult?.transactions) {
-    content = (
-      <TransactionsContext
-        value={{ transactions: transactionsResult.transactions }}
-      >
-        {content}
-      </TransactionsContext>
-    )
+  const pageData: PageData = {
+    transactions: transactionsResult?.transactions,
+    customCategories: categoriesResult?.customCategories,
+    budgets: budgetsResult?.budgets,
+    goals: goalsResult?.goals,
+    recurringTransactions: recurringResult?.recurringTransactions,
   }
 
-  if (categories && categoriesResult?.customCategories) {
-    content = (
-      <CategoriesContext
-        value={{ customCategories: categoriesResult.customCategories }}
-      >
-        {content}
-      </CategoriesContext>
-    )
-  }
-
-  if (budgets && budgetsResult?.budgets) {
-    content = (
-      <BudgetsContext value={{ budgets: budgetsResult.budgets }}>
-        {content}
-      </BudgetsContext>
-    )
-  }
-
-  if (goals && goalsResult?.goals) {
-    content = (
-      <GoalsContext value={{ goals: goalsResult.goals }}>
-        {content}
-      </GoalsContext>
-    )
-  }
-
-  if (recurring && recurringResult?.recurringTransactions) {
-    content = (
-      <RecurringContext
-        value={{
-          recurringTransactions: recurringResult.recurringTransactions,
-        }}
-      >
-        {content}
-      </RecurringContext>
-    )
-  }
-
-  return <>{content}</>
+  return <PageDataContext value={pageData}>{children}</PageDataContext>
 }

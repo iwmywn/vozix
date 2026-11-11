@@ -38,7 +38,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useTransactions } from "@/contexts/transactions-context"
 import { useUser } from "@/contexts/user-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
@@ -51,13 +50,14 @@ const ITEMS_PER_PAGE = 10
 interface TransactionsTableProps {
   filteredTransactions: Transaction[]
   filterKey?: string
+  isTotalEmpty?: boolean
 }
 
 export function TransactionsTable({
   filteredTransactions,
   filterKey,
+  isTotalEmpty,
 }: TransactionsTableProps) {
-  const { transactions } = useTransactions()
   const { user } = useUser()
   const t = useExtracted()
   const { getCategoryLabel, getCategoryDescription } = useCategory()
@@ -107,7 +107,7 @@ export function TransactionsTable({
               icon={<WalletIcon />}
               title={t("No transactions found")}
               description={
-                transactions.length === 0
+                isTotalEmpty
                   ? t("You haven't created any transactions yet.")
                   : t("No transactions found matching your filters.")
               }

@@ -28,7 +28,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useTransactions } from "@/contexts/transactions-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { buildTransactionsHref } from "@/lib/filters"
@@ -40,14 +39,15 @@ interface StatisticsTableProps {
   valuations: CategoryRollupValuation[]
   hasUnconverted?: boolean
   filterStates?: TemporalFilterState
+  isTotalEmpty?: boolean
 }
 
 export function StatisticsTable({
   valuations,
   hasUnconverted = false,
   filterStates,
+  isTotalEmpty,
 }: StatisticsTableProps) {
-  const { transactions } = useTransactions()
   const t = useExtracted()
   const { getCategoryLabel, getCategoryDescription } = useCategory()
   const formatCurrency = useFormatCurrency()
@@ -67,7 +67,7 @@ export function StatisticsTable({
             icon={<WalletIcon />}
             title={t("No transactions found")}
             description={
-              transactions.length === 0
+              isTotalEmpty
                 ? t("You haven't created any transactions yet.")
                 : hasUnconverted
                   ? t("Exchange rate pending")

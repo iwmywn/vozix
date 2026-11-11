@@ -22,12 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useCategories } from "@/contexts/categories-context"
+import { usePageCategories } from "@/contexts/page-data-context"
 import type { CategoryType } from "@/lib/category"
 import { filterCustomCategories } from "@/lib/filters"
 
 export function CategoryFilters() {
-  const { customCategories } = useCategories()
+  const customCategories = usePageCategories()
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [filterType, setFilterType] = useState<"all" | "inflow" | "outflow">(
     "all"
@@ -113,7 +113,10 @@ export function CategoryFilters() {
         </CardContent>
       </Card>
 
-      <CategoriesTable filteredCategories={filteredCategories} />
+      <CategoriesTable
+        filteredCategories={filteredCategories}
+        isTotalEmpty={customCategories.length === 0}
+      />
     </>
   )
 }

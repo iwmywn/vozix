@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useRecurring } from "@/contexts/recurring-context"
+import { usePageRecurring } from "@/contexts/page-data-context"
 import { useCategory } from "@/hooks/use-category"
 import { useMonths } from "@/hooks/use-months"
 import type { CategoryKey, CategoryType } from "@/lib/category"
@@ -33,7 +33,7 @@ import type { ScheduleStatus } from "@/lib/definitions"
 import { evaluateRecurringSchedules } from "@/lib/recurring"
 
 export function RecurringTransactionFilters() {
-  const { recurringTransactions } = useRecurring()
+  const recurringTransactions = usePageRecurring()
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [filterMonth, setFilterMonth] = useState<string>("all")
   const [filterYear, setFilterYear] = useState<string>("all")
@@ -270,7 +270,10 @@ export function RecurringTransactionFilters() {
         </CardContent>
       </Card>
 
-      <RecurringTransactionsTable evaluatedSchedules={filteredSchedules} />
+      <RecurringTransactionsTable
+        evaluatedSchedules={filteredSchedules}
+        isTotalEmpty={recurringTransactions.length === 0}
+      />
     </>
   )
 }

@@ -16,8 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useBudgets } from "@/contexts/budgets-context"
-import { useTransactions } from "@/contexts/transactions-context"
+import {
+  usePageBudgets,
+  usePageTransactions,
+} from "@/contexts/page-data-context"
 import { useCategory } from "@/hooks/use-category"
 import { useMonths } from "@/hooks/use-months"
 import type { CategoryKey } from "@/lib/category"
@@ -27,8 +29,8 @@ import { FinancialRollupEngine } from "@/lib/valuation-engine"
 import type { RollupHealth } from "@/lib/valuation-engine"
 
 export function BudgetFilters() {
-  const { budgets } = useBudgets()
-  const { transactions } = useTransactions()
+  const budgets = usePageBudgets()
+  const transactions = usePageTransactions()
   const [filterMonth, setFilterMonth] = useState<string>("all")
   const [filterYear, setFilterYear] = useState<string>("all")
   const [filterCategoryKey, setFilterCategoryKey] = useState<
@@ -233,7 +235,10 @@ export function BudgetFilters() {
         </CardContent>
       </Card>
 
-      <BudgetsTable valuations={valuations} />
+      <BudgetsTable
+        valuations={valuations}
+        isTotalEmpty={budgets.length === 0}
+      />
     </>
   )
 }

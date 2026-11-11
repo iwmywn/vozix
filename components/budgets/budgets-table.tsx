@@ -32,7 +32,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useBudgets } from "@/contexts/budgets-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
@@ -43,10 +42,10 @@ import type { BudgetValuation } from "@/lib/valuation-engine"
 
 interface BudgetsTableProps {
   valuations: BudgetValuation[]
+  isTotalEmpty?: boolean
 }
 
-export function BudgetsTable({ valuations }: BudgetsTableProps) {
-  const { budgets } = useBudgets()
+export function BudgetsTable({ valuations, isTotalEmpty }: BudgetsTableProps) {
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
   const [isEditOpen, setIsEditOpen] = useState<boolean>(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
@@ -69,7 +68,7 @@ export function BudgetsTable({ valuations }: BudgetsTableProps) {
               icon={<PiggyBankIcon />}
               title={t("No budgets found")}
               description={
-                budgets.length === 0
+                isTotalEmpty
                   ? t("You haven't created any budgets yet.")
                   : t("No budgets found matching your filters.")
               }

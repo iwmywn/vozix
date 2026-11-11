@@ -24,15 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useCategories } from "@/contexts/categories-context"
 import type { Category } from "@/lib/definitions"
 
 interface CategoriesTableProps {
   filteredCategories: Category[]
+  isTotalEmpty?: boolean
 }
 
-export function CategoriesTable({ filteredCategories }: CategoriesTableProps) {
-  const { customCategories } = useCategories()
+export function CategoriesTable({
+  filteredCategories,
+  isTotalEmpty,
+}: CategoriesTableProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
   )
@@ -49,7 +51,7 @@ export function CategoriesTable({ filteredCategories }: CategoriesTableProps) {
               icon={<TagIcon />}
               title={t("No categories found")}
               description={
-                customCategories.length === 0
+                isTotalEmpty
                   ? t("You haven't created any custom categories yet.")
                   : t("No categories found matching your filters.")
               }

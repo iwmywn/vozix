@@ -32,7 +32,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useGoals } from "@/contexts/goals-context"
 import { useCategory } from "@/hooks/use-category"
 import { useFormatCurrency } from "@/hooks/use-format-currency"
 import { useFormatDate } from "@/hooks/use-format-date"
@@ -43,10 +42,10 @@ import type { GoalValuation } from "@/lib/valuation-engine"
 
 interface GoalsTableProps {
   valuations: GoalValuation[]
+  isTotalEmpty?: boolean
 }
 
-export function GoalsTable({ valuations }: GoalsTableProps) {
-  const { goals } = useGoals()
+export function GoalsTable({ valuations, isTotalEmpty }: GoalsTableProps) {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [isEditOpen, setIsEditOpen] = useState<boolean>(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
@@ -69,7 +68,7 @@ export function GoalsTable({ valuations }: GoalsTableProps) {
               icon={<TargetIcon />}
               title={t("No goals found")}
               description={
-                goals.length === 0
+                isTotalEmpty
                   ? t("You haven't created any goals yet.")
                   : t("No goals found matching your filters.")
               }
