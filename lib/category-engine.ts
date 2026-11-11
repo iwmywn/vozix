@@ -305,13 +305,17 @@ async function executeDeleteCustomCategory(
     }
   }
 
-  await categoriesCollection.deleteOne(
+  const deleteResult = await categoriesCollection.deleteOne(
     {
       _id: categoryObjectId,
       userId: new ObjectId(userId),
     },
     { session }
   )
+
+  if (deleteResult.deletedCount === 0) {
+    return { success: false, error: "not_found" }
+  }
 
   return { success: true }
 }
