@@ -462,6 +462,30 @@ describe("CategoryEngine", () => {
       }
     })
 
+    it("should prevent deletion when category is referenced with uppercase categoryKey in transactions", async () => {
+      const category = {
+        ...mockDBCustomCategory,
+        _id: new ObjectId("691da72dc1d54fad20174ab7"),
+      }
+      await insertTestCategory(category)
+      await insertTestTransaction({
+        ...mockDBTransaction,
+        categoryKey: category._id.toString().toUpperCase(),
+      })
+
+      const result = await CategoryEngine.deleteCustomCategory(
+        mockDBUser._id.toString(),
+        category._id.toString()
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe("in_use")
+      if (result.error === "in_use") {
+        expect(result.blockingEntity).toBe("transactions")
+        expect(result.blockingCount).toBe(1)
+      }
+    })
+
     it("should successfully delete an unreferenced custom category atomically", async () => {
       await insertTestCategory(mockDBCustomCategory)
 

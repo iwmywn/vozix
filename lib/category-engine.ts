@@ -202,13 +202,16 @@ export async function getCategoryUsage(
   }
 
   const userObjectId = new ObjectId(userId)
-  const normalizedCategoryId = ObjectId.isValid(categoryId)
+  const isObjectId = ObjectId.isValid(categoryId)
+  const normalizedCategoryId = isObjectId
     ? new ObjectId(categoryId).toHexString()
     : categoryId
 
   const filter = {
     userId: userObjectId,
-    categoryKey: normalizedCategoryId,
+    categoryKey: isObjectId
+      ? { $regex: new RegExp(`^${normalizedCategoryId}$`, "i") }
+      : normalizedCategoryId,
   }
 
   let transactionCount: number
