@@ -29,94 +29,10 @@ import {
   getCustomCategories,
   updateCustomCategory,
 } from "@/actions/category.actions"
-import { isValidUserCategory } from "@/actions/category.server"
 import { getCategoriesCollection } from "@/lib/collections"
 import { triggerRateLimit } from "@/lib/rate-limit"
 
 describe("Categories", async () => {
-  describe("isValidUserCategory", () => {
-    it("should return true for valid predefined categories with matching type", async () => {
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          "salary_bonus",
-          "inflow"
-        )
-      ).toBe(true)
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          "food_beverage",
-          "outflow"
-        )
-      ).toBe(true)
-      expect(
-        await isValidUserCategory(mockDBUser._id.toString(), "salary_bonus")
-      ).toBe(true)
-    })
-
-    it("should return false for predefined categories with mismatched type", async () => {
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          "salary_bonus",
-          "outflow"
-        )
-      ).toBe(false)
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          "food_beverage",
-          "inflow"
-        )
-      ).toBe(false)
-    })
-
-    it("should return false for invalid category format or non-existent key", async () => {
-      expect(
-        await isValidUserCategory(mockDBUser._id.toString(), "non_existent_key")
-      ).toBe(false)
-      expect(
-        await isValidUserCategory(mockDBUser._id.toString(), "12345")
-      ).toBe(false)
-    })
-
-    it("should return false for custom category owned by another user", async () => {
-      await insertTestCategory({
-        ...mockDBCustomCategory,
-        userId: new ObjectId("690d2cdc200d6a719f9a438e"),
-      })
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          mockDBCustomCategory._id.toString()
-        )
-      ).toBe(false)
-    })
-
-    it("should return false for custom category with mismatched type", async () => {
-      await insertTestCategory(mockDBCustomCategory)
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          mockDBCustomCategory._id.toString(),
-          "inflow"
-        )
-      ).toBe(false)
-    })
-
-    it("should return true for custom category owned by user with matching type", async () => {
-      await insertTestCategory(mockDBCustomCategory)
-      expect(
-        await isValidUserCategory(
-          mockDBUser._id.toString(),
-          mockDBCustomCategory._id.toString(),
-          mockDBCustomCategory.type
-        )
-      ).toBe(true)
-    })
-  })
-
   describe("createCustomCategory", () => {
     it("should return error when data is invalid", async () => {
       // @ts-expect-error - Testing invalid data

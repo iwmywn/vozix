@@ -24,16 +24,19 @@ vi.mock("next/server", () => ({
 }))
 
 // Mock category check
-const mockIsValidUserCategory = vi.fn()
-vi.mock("@/actions/category.server", () => ({
-  isValidUserCategory: (...args: unknown[]) => mockIsValidUserCategory(...args),
+const mockIsValidCategory = vi.fn()
+vi.mock("@/lib/category-engine", () => ({
+  CategoryEngine: {
+    isValidCategory: (...args: unknown[]) => mockIsValidCategory(...args),
+  },
+  isValidCategory: (...args: unknown[]) => mockIsValidCategory(...args),
 }))
 
 describe("runDomainMutation Pipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAuthenticatedUser()
-    mockIsValidUserCategory.mockResolvedValue(true)
+    mockIsValidCategory.mockResolvedValue(true)
   })
 
   describe("resolveResourceTag", () => {
@@ -198,7 +201,7 @@ describe("runDomainMutation Pipeline", () => {
 
   describe("Category Integrity Check", () => {
     it("should reject when categoryCheck returns invalid category", async () => {
-      mockIsValidUserCategory.mockResolvedValue(false)
+      mockIsValidCategory.mockResolvedValue(false)
 
       const result = await runDomainMutation({
         rawInput: { categoryKey: "unknown" },

@@ -1,19 +1,10 @@
 "use server"
 
-import { cacheTag } from "next/cache"
-import { ObjectId } from "mongodb"
 import { getExtracted } from "next-intl/server"
 import { z } from "zod"
 
 import { runDomainMutation } from "@/lib/action-handler"
-import {
-  getBudgetsCollection,
-  getCategoriesCollection,
-  getGoalsCollection,
-  getRecurringTransactionsCollection,
-  getTransactionsCollection,
-} from "@/lib/collections"
-import { withTransaction } from "@/lib/db"
+import { CategoryEngine } from "@/lib/category-engine"
 import type { ActionResponse, Category } from "@/lib/definitions"
 import { RATE_LIMIT_PRESETS } from "@/lib/rate-limit"
 import { getSchemas } from "@/schemas/server"
@@ -37,14 +28,7 @@ export async function createCustomCategory(
       "Failed to create category! Please try again later."
     ),
     execute: async ({ input, user }) => {
-      const categoriesCollection = await getCategoriesCollection()
-
-      await categoriesCollection.insertOne({
-        userId: new ObjectId(user.id),
-        type: input.type,
-        label: input.label,
-        description: input.description,
-      })
+      await CategoryEngine.createCustomCategory(user.id, input)
     },
   })
 }
@@ -76,32 +60,14 @@ export async function updateCustomCategory(
       "Failed to update category! Please try again later."
     ),
     execute: async ({ input, user }) => {
-      const categoriesCollection = await getCategoriesCollection()
-
-      const result = await categoriesCollection.updateOne(
-        {
-          _id: new ObjectId(input.id),
-          userId: new ObjectId(user.id),
-          type: input.values.type,
-        },
-        {
-          $set: {
-            label: input.values.label,
-            description: input.values.description,
-          },
-        }
+      const result = await CategoryEngine.updateCustomCategory(
+        user.id,
+        input.id,
+        input.values
       )
 
-      if (result.matchedCount === 0) {
-        const existingCategory = await categoriesCollection.findOne(
-          {
-            _id: new ObjectId(input.id),
-            userId: new ObjectId(user.id),
-          },
-          { projection: { type: 1 } }
-        )
-
-        if (existingCategory && existingCategory.type !== input.values.type) {
+      if (!result.success) {
+        if (result.error === "type_immutable") {
           return {
             error: t("Category type cannot be changed!"),
           }
@@ -132,31 +98,11 @@ export async function deleteCustomCategory(
     fallbackErrorMessage: t(
       "Failed to delete category! Please try again later."
     ),
-    execute: async ({ input: categoryId, user }) => {
-      const [
-        categoriesCollection,
-        transactionsCollection,
-        budgetsCollection,
-        goalsCollection,
-        recurringTransactionsCollection,
-      ] = await Promise.all([
-        getCategoriesCollection(),
-        getTransactionsCollection(),
-        getBudgetsCollection(),
-        getGoalsCollection(),
-        getRecurringTransactionsCollection(),
-      ])
+    execute: async ({ input: id, user }) => {
+      const result = await CategoryEngine.deleteCustomCategory(user.id, id)
 
-      return withTransaction(async (dbSession) => {
-        const existingCategory = await categoriesCollection.findOne(
-          {
-            _id: new ObjectId(categoryId),
-            userId: new ObjectId(user.id),
-          },
-          { session: dbSession }
-        )
-
-        if (!existingCategory) {
+      if (!result.success) {
+        if (result.error === "not_found") {
           return {
             error: t(
               "Category not found or you don't have permission to delete!"
@@ -164,94 +110,39 @@ export async function deleteCustomCategory(
           }
         }
 
-        const [
-          transactionCount,
-          budgetCount,
-          goalCount,
-          recurringTransactionCount,
-        ] = await Promise.all([
-          transactionsCollection.countDocuments(
-            {
-              userId: new ObjectId(user.id),
-              categoryKey: categoryId,
-            },
-            { session: dbSession }
-          ),
-          budgetsCollection.countDocuments(
-            {
-              userId: new ObjectId(user.id),
-              categoryKey: categoryId,
-            },
-            { session: dbSession }
-          ),
-          goalsCollection.countDocuments(
-            {
-              userId: new ObjectId(user.id),
-              categoryKey: categoryId,
-            },
-            { session: dbSession }
-          ),
-          recurringTransactionsCollection.countDocuments(
-            {
-              userId: new ObjectId(user.id),
-              categoryKey: categoryId,
-            },
-            { session: dbSession }
-          ),
-        ])
-
-        if (transactionCount > 0) {
-          return {
-            error: t(
-              "Cannot delete category. There are {count} transactions using this category. Please delete those transactions first.",
-              {
-                count: transactionCount.toString(),
+        if (result.error === "in_use") {
+          switch (result.blockingEntity) {
+            case "transactions":
+              return {
+                error: t(
+                  "Cannot delete category. There are {count} transactions using this category. Please delete those transactions first.",
+                  { count: result.blockingCount.toString() }
+                ),
               }
-            ),
+            case "budgets":
+              return {
+                error: t(
+                  "Cannot delete category. There are {count} budgets using this category. Please delete those budgets first.",
+                  { count: result.blockingCount.toString() }
+                ),
+              }
+            case "goals":
+              return {
+                error: t(
+                  "Cannot delete category. There are {count} goals using this category. Please delete those goals first.",
+                  { count: result.blockingCount.toString() }
+                ),
+              }
+            case "recurringTransactions":
+              return {
+                error: t(
+                  "Cannot delete category. There are {count} recurring transactions using this category. Please delete those recurring transactions first.",
+                  { count: result.blockingCount.toString() }
+                ),
+              }
           }
         }
-
-        if (budgetCount > 0) {
-          return {
-            error: t(
-              "Cannot delete category. There are {count} budgets using this category. Please delete those budgets first.",
-              {
-                count: budgetCount.toString(),
-              }
-            ),
-          }
-        }
-
-        if (goalCount > 0) {
-          return {
-            error: t(
-              "Cannot delete category. There are {count} goals using this category. Please delete those goals first.",
-              {
-                count: goalCount.toString(),
-              }
-            ),
-          }
-        }
-
-        if (recurringTransactionCount > 0) {
-          return {
-            error: t(
-              "Cannot delete category. There are {count} recurring transactions using this category. Please delete those recurring transactions first.",
-              {
-                count: recurringTransactionCount.toString(),
-              }
-            ),
-          }
-        }
-
-        await categoriesCollection.deleteOne(
-          {
-            _id: new ObjectId(categoryId),
-            userId: new ObjectId(user.id),
-          },
-          { session: dbSession }
-        )
-      })
+      }
     },
   })
 }
@@ -266,29 +157,13 @@ export async function getCustomCategories(): Promise<{
     return { error }
   }
 
-  return getCachedCustomCategories(user.id)
-}
-
-async function getCachedCustomCategories(userId: string) {
-  "use cache: private"
-  cacheTag(`categories-${userId}`)
-
   const t = await getExtracted()
 
   try {
-    const categoriesCollection = await getCategoriesCollection()
-    const categories = await categoriesCollection
-      .find({ userId: new ObjectId(userId) })
-      .sort({ _id: -1 })
-      .toArray()
-
-    return {
-      customCategories: categories.map((category) => ({
-        ...category,
-        _id: category._id.toString(),
-        userId: category.userId.toString(),
-      })) as Category[],
-    }
+    const customCategories = await CategoryEngine.getCachedCustomCategories(
+      user.id
+    )
+    return { customCategories }
   } catch (error) {
     console.error("Error fetching custom categories:", error)
     return {
