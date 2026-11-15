@@ -1,3 +1,37 @@
+## [26.47.0](https://github.com/iwmywn/vozix/compare/v26.36.0...v26.47.0)
+
+Thank you to all the contributors who made this release possible!
+
+### Features
+
+- **admin:** extract unban user form and refactor dialog cancel actions (@iwmywn) ([#25](https://github.com/iwmywn/vozix/pull/25)) ([82d8f97](https://github.com/iwmywn/vozix/commit/82d8f978627e526ea55a36dfdbd434cf41bfb554))
+
+### Bug Fixes
+
+- preserve session renewal cookies and improve post-action notifications (@iwmywn) ([#28](https://github.com/iwmywn/vozix/pull/28)) ([91d1837](https://github.com/iwmywn/vozix/commit/91d183723ea69331ee9f84cfaa10b121d5f29ee2))
+- update stuff (@iwmywn) ([#22](https://github.com/iwmywn/vozix/pull/22)) ([940b718](https://github.com/iwmywn/vozix/commit/940b718533fa5a874d5bda11d12c8f9e81a83a7a))
+
+### Nerd stuff
+
+These changes will not be visible to users, but are included for completeness and to credit contributors.
+
+- **docs(agents):** configure local markdown issue tracker, triage labels, and domain docs ([eba280e](https://github.com/iwmywn/vozix/commit/eba280e1043186ff5f0d47bba09ec28a11f0281a))
+- **refactor(seam):** sever inverted actions dependency and eliminate pass-through modules (@iwmywn) ([#36](https://github.com/iwmywn/vozix/pull/36)) ([a2ed4c0](https://github.com/iwmywn/vozix/commit/a2ed4c003c349a49ce2f0d5ae48c4c66df9b5f29))
+- **refactor(category):** introduce CategoryEngine and encapsulate referential integrity (@iwmywn) ([#35](https://github.com/iwmywn/vozix/pull/35)) ([44498a2](https://github.com/iwmywn/vozix/commit/44498a25c1de16eae1679716f68acd115a3c1717))
+- **refactor(hydration):** collapse shallow entity contexts into unified page data module ([#34](https://github.com/iwmywn/vozix/pull/34)) ([2c72d5a](https://github.com/iwmywn/vozix/commit/2c72d5a3e72c7704aad49ca87d82da01db0b8f27))
+- **refactor(currency):** encapsulate failure handling and queue fallback in ensureExchangeRateForDate ([#33](https://github.com/iwmywn/vozix/pull/33)) ([a4e2c5b](https://github.com/iwmywn/vozix/commit/a4e2c5bb14c827d41589f5a85a7b06181f17dbe1))
+- **refactor(filters):** deepen transaction query, temporal filter state, and CSV export into lib/filters (@iwmywn) ([#32](https://github.com/iwmywn/vozix/pull/32)) ([0345e9b](https://github.com/iwmywn/vozix/commit/0345e9b13fb58361a4977d1fce8b0fa7cd8dc08d))
+- **refactor(currency):** reconcile only queued dates and remove auto-sync for yesterday (@iwmywn) ([#31](https://github.com/iwmywn/vozix/pull/31)) ([db59d95](https://github.com/iwmywn/vozix/commit/db59d95ef21eda8b3dc48eebc92212d21bbddf02))
+- **refactor(recurring):** consolidate schedule evaluation into deep module (@iwmywn) ([#30](https://github.com/iwmywn/vozix/pull/30)) ([c4b5fbd](https://github.com/iwmywn/vozix/commit/c4b5fbd7a964ff3aec4127e181f87a137380360d))
+- **refactor:** consolidate financial rollups into valuation engine and remove shallow wrappers (@iwmywn) ([#29](https://github.com/iwmywn/vozix/pull/29)) ([a654af2](https://github.com/iwmywn/vozix/commit/a654af2675ae08ab5bf61b82a32a3b31bd004ee2))
+- **refactor:** extract deep engines for domain mutations and financial rollups (@iwmywn) ([#27](https://github.com/iwmywn/vozix/pull/27)) ([e783888](https://github.com/iwmywn/vozix/commit/e7838881ca4838767910e3a48958b964198dfa3f))
+- **refactor:** extract deep engines for recurring schedules and currency sync (@iwmywn) ([#26](https://github.com/iwmywn/vozix/pull/26)) ([aa5fc37](https://github.com/iwmywn/vozix/commit/aa5fc37f757c9c1d58c1e13a5999d4882749e24c))
+- **refactor:** rename project brand to vozix (@iwmywn) ([#24](https://github.com/iwmywn/vozix/pull/24)) ([f45e56c](https://github.com/iwmywn/vozix/commit/f45e56ce63c6ef013995af7987a7144a560fb588))
+- **test(e2e):** add tests (@iwmywn) ([#23](https://github.com/iwmywn/vozix/pull/23)) ([7d93035](https://github.com/iwmywn/vozix/commit/7d93035207173a251c42b2b5bd87ea46040cd585))
+- **chore:** update deps ([4db0362](https://github.com/iwmywn/vozix/commit/4db03621eb2639e1fdf9ec8606b77f394de477df))
+- **chore:** update dep and skills lock ([ddeddc0](https://github.com/iwmywn/vozix/commit/ddeddc0f6965dbee02884b00d074798c5f956372))
+- **chore:** update deps ([b1c1ac4](https://github.com/iwmywn/vozix/commit/b1c1ac456d6e06f5938391f6bdda24382dca5bd5))
+
 ## [26.36.0](https://github.com/iwmywn/vozix/compare/v26.32.0...v26.36.0)
 
 ### Features
