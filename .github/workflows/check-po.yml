@@ -24,7 +24,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 12.18.0
+          version: 12.21.0
           run_install: false
 
       - name: Check PO files

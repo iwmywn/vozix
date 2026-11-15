@@ -29,18 +29,18 @@
     "db:logs": "docker compose logs -f"
   },
   "dependencies": {
-    "@better-auth/mongo-adapter": "1.7.20",
-    "@hookform/resolvers": "7.0.5",
+    "@better-auth/mongo-adapter": "1.7.25",
+    "@hookform/resolvers": "7.0.6",
     "@t3-oss/env-nextjs": "0.13.11",
-    "better-auth": "1.7.20",
+    "better-auth": "1.7.25",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.2",
     "decimal.js": "10.6.0",
-    "lucide-react": "1.72.0",
+    "lucide-react": "1.73.0",
     "minisearch": "7.2.0",
-    "mongodb": "7.8.0",
+    "mongodb": "7.9.0",
     "next": "16.4.6",
-    "next-intl": "4.15.0",
+    "next-intl": "4.15.1",
     "next-themes": "0.4.6",
     "nuqs": "2.10.3",
     "radix-ui": "1.8.1",
@@ -60,11 +60,11 @@
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
     "@iwmywn/release": "2.0.0",
-    "@playwright/test": "1.65.0",
+    "@playwright/test": "1.65.1",
     "@tailwindcss/postcss": "4.3.5",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
-    "@testing-library/user-event": "14.6.9",
+    "@testing-library/user-event": "14.6.10",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -75,7 +75,7 @@
     "mongodb-memory-server": "11.3.0",
     "oxfmt": "0.78.0",
     "oxlint": "1.93.0",
-    "react-doctor": "0.9.22",
+    "react-doctor": "0.9.23",
     "tailwindcss": "4.3.5",
     "tw-animate-css": "1.4.0",
     "typescript": "6.0.3",
@@ -95,5 +95,5 @@
       "onFail": "warn"
     }
   },
-  "packageManager": "pnpm@12.18.0"
+  "packageManager": "pnpm@12.21.0"
 }
